@@ -1,2 +1,4 @@
 # NOCS_PyTorch
-NOCS reimplementation in PyTorch
+NOCS reimplementation using PyTorch
+
+DeepRob Course Project
