@@ -6,6 +6,9 @@ import numpy as np
 import cv2
 from torch.utils.data import Dataset
 import matplotlib.pyplot as plt
+import glob
+import torchvision.transforms.functional as F
+from torch.utils.data import DataLoader
 
 
 def process_data(mask_im, coord_map, inst_dict, meta_path, load_RT=False):
@@ -28,7 +31,7 @@ def process_data(mask_im, coord_map, inst_dict, meta_path, load_RT=False):
 
     # flip z axis of coord map
     coord_map = np.array(coord_map, dtype=np.float32) / 255
-    coord_map[:, :, 2] = 1 - coord_map[:, :, 2]
+    # coord_map[:, :, 2] = 1 - coord_map[:, :, 2]
 
 
     masks = np.zeros([h, w, num_instance], dtype=np.uint8)
@@ -76,7 +79,9 @@ def load_mask(image_id):
     """
     # info = self.image_info[image_id]
 
-    general_path = 'data/train/00004' + '/' + image_id
+    # general_path = 'data/train/00012' + '/' + image_id
+
+    general_path = image_id
 
     mask_path = general_path + '_mask.png'
     coord_path = general_path + '_coord.png'
@@ -104,45 +109,89 @@ def load_mask(image_id):
     return masks, coords, class_ids
 
 
-class CustomImageDataset(Dataset):
-    def __init__(self, annotations_file, img_dir, transform=None, target_transform=None):
-        self.img_labels = pd.read_csv(annotations_file)
+class TrainData(Dataset):
+    def __init__(self, img_dir):
         self.img_dir = img_dir
-        self.transform = transform
-        self.target_transform = target_transform
+        self.img_annos = glob.glob(img_dir + '/**/*.txt', recursive = True)
 
     def __len__(self):
-        return len(self.img_labels)
+
+        return len(self.img_annos)
 
     def __getitem__(self, idx):
-        img_path = os.path.join(self.img_dir, self.img_labels.iloc[idx, 0])
-        image = read_image(img_path)
-        label = self.img_labels.iloc[idx, 1]
-        if self.transform:
-            image = self.transform(image)
-        if self.target_transform:
-            label = self.target_transform(label)
-        return image, label
+
+        dumbo = self.img_annos[idx]
+        dumbo = dumbo.split('_')[0]
+
+        img_path = dumbo
+
+        image = read_image(img_path+'_color.png')
+        
+        masks, coords, class_ids = load_mask(img_path)
+
+        sample = {'image':image,'masks':masks,'coords':coords,'class_ids':class_ids}
+
+        return sample
+    
+def overlap_nocs(image,coords):
+
+    # mask_binary = np.max(masks,2)
+    nocs_map = np.sum(coords,2)
+    alpha = np.sum(nocs_map,2,keepdims = True)
+    nocs_map_alpha = np.concatenate((nocs_map,alpha),axis=2)
+
+    # print(nocs_map.shape,alpha.shape)
+
+    plt.imshow(F.to_pil_image(image))
+    plt.imshow(nocs_map_alpha)
+    plt.pause(0.001)
+
+
     
 def main():
 
-    masks, coords, class_ids = load_mask('0005')
-    print(masks.shape,coords.shape,class_ids.shape)
+    trainset = TrainData('data/train')
+
+    fig = plt.figure()
+
+    for i in range(len(trainset)):
+
+        sample = trainset[i]
+
+        # print(i, sample['image'].shape, sample['masks'].shape)
+
+        ax = plt.subplot(1, 4, i + 1)
+        plt.tight_layout()
+        ax.set_title('Sample #{}'.format(i))
+        ax.axis('off')
+        overlap_nocs(sample['image'],sample['coords'])
+
+        if i == 3:
+            plt.show()
+            break
+    
+    trainloader = DataLoader(trainset, batch_size=4, shuffle=True)
 
 
-    mask_binary = np.max(masks,2)
-    nocs_map = np.sum(coords,2)
+    # while(1):
 
-    print(mask_binary[0,0])
+    #     img_id = input("Enter img_id:")
+    #     masks, coords, class_ids = load_mask(img_id)
+    #     print(masks.shape,coords.shape,class_ids.shape)
 
-    plt.figure()
-    plt.subplot(2,1,1)
-    plt.imshow(mask_binary,cmap='binary')
 
-    plt.subplot(2,1,2)
-    plt.imshow(nocs_map,cmap='brg_r')
+    #     mask_binary = np.max(masks,2)
+    #     nocs_map = np.sum(coords,2)
+    #     nocs_map[nocs_map == 0.] = 1.0
 
-    plt.show()
+    #     plt.figure()
+    #     plt.subplot(2,1,1)
+    #     plt.imshow(mask_binary,cmap='binary')
+
+    #     plt.subplot(2,1,2)
+    #     plt.imshow(nocs_map,cmap='brg')
+
+    #     plt.show()
 
 if __name__ == "__main__":
     main()
