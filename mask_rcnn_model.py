@@ -24,19 +24,30 @@ def visualize_segmentation(model, image_path, threshold=0.5):
     # Extract the predicted masks, labels, and scores
     masks = predictions[0]['masks']
     scores = predictions[0]['scores']
+
+    for key,val in predictions[0].items():
+        print(key,val.shape)
+
+    # keys: ['boxes', 'labels', 'scores', 'masks']
     
     # Create a copy of the input image for visualization
-    vis_image = image.copy()
+    labels = predictions[0]['labels']
+    vis_image = image.copy()    
 
     # Overlay the predicted masks with a transparency factor (alpha)
+    full_img = torch.zeros_like(masks[0,0])
     for i in range(len(masks)):
-        if scores[i] > threshold:
+        if scores[i] > threshold and labels[i] in valid_classes:
             mask = masks[i, 0].mul(255).byte().cpu().numpy()
             color = tuple(random.randint(0, 255) for _ in range(3))
 
             vis_image = apply_mask(vis_image, mask, color,alpha=0.6)
-    
-    return vis_image
+
+            full_img = full_mask(full_img,mask)
+
+            print(predictions[0]['labels'][i])
+
+    return vis_image, full_img
 
 # Define the function to apply a mask to an image
 def apply_mask(image, mask, color, alpha=0.5):
@@ -56,6 +67,12 @@ def apply_mask(image, mask, color, alpha=0.5):
     
     return im
 
+def full_mask(full_img,mask):
+
+    full_img += mask
+
+    return full_img
+
 # Compute the Intersection over Union (IoU) between two masks
 def iou(mask1, mask2):
     intersection = (mask1 & mask2).sum()
@@ -67,7 +84,7 @@ def main():
     # Load the images from the test_data folder
 
     parser = argparse.ArgumentParser()
-    parser.add_argument("test_data_dir", help="location of test data with respect to current folder",
+    parser.add_argument("--test_data_dir", help="location of test data with respect to current folder",
                     type=str)
     args = parser.parse_args()
 
@@ -80,8 +97,9 @@ def main():
     # Perform the segmentation, visualize the results, and evaluate against ground truth masks
     iou_scores = []
     for color_image_path, mask_image_path in zip(color_image_paths, mask_image_paths):
-        vis_image = visualize_segmentation(model_mask_rcnn, color_image_path)
+        vis_image, mask = visualize_segmentation(model_mask_rcnn, color_image_path)
         plt.figure()
+        plt.subplot(2,2,1)
         plt.imshow(vis_image)
         plt.title(os.path.basename(color_image_path))
         plt.axis('off')
@@ -89,7 +107,19 @@ def main():
         # Load the ground truth mask and compute IoU
         gt_mask = Image.open(mask_image_path).convert('1')
         gt_mask_array = np.array(gt_mask)
+
         pred_mask_array = np.array(vis_image.convert('1'))
+
+        mask = mask.cpu().detach().numpy()
+        mask = mask > 0
+
+        # print(mask[0])
+
+        plt.subplot(2,2,2)
+        plt.imshow(np.invert(mask))
+        plt.subplot(2,2,3)
+        plt.imshow(gt_mask_array)
+
         iou_score = iou(gt_mask_array, pred_mask_array)
         iou_scores.append(iou_score)
         print(f"IoU score for {os.path.basename(color_image_path)}: {iou_score:.4f}")
