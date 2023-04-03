@@ -7,8 +7,11 @@ import cv2
 from torch.utils.data import Dataset
 import matplotlib.pyplot as plt
 import glob
-import torchvision.transforms.functional as F
+import torchvision.transforms.functional as TF
 from torch.utils.data import DataLoader
+import math
+from torchvision.transforms import InterpolationMode
+from torchvision import utils
 
 
 def process_data(mask_im, coord_map, inst_dict, meta_path, load_RT=False):
@@ -24,6 +27,7 @@ def process_data(mask_im, coord_map, inst_dict, meta_path, load_RT=False):
     del instance_ids[-1]
 
     cdata[cdata==255] = -1
+
     assert(np.unique(cdata).shape[0] < 20)
 
     num_instance = len(instance_ids)
@@ -74,12 +78,9 @@ def process_data(mask_im, coord_map, inst_dict, meta_path, load_RT=False):
     return masks, coords, class_ids
 
 
-def load_mask(image_id):
+def load_mask(image_id,transform = None):
     """Generate instance masks for the objects in the image with the given ID.
     """
-    # info = self.image_info[image_id]
-
-    # general_path = 'data/train/00012' + '/' + image_id
 
     general_path = image_id
 
@@ -101,18 +102,32 @@ def load_mask(image_id):
             inst_dict[inst_id] = cls_id
 
     mask_im = cv2.imread(mask_path)[:, :, 2]
+
     coord_map = cv2.imread(coord_path)[:, :, :3]
+
+    if transform:
+        coord_map = torch.tensor(coord_map).unsqueeze(0).permute(0,3,1,2)[0]
+        mask_im = torch.tensor(mask_im).unsqueeze(0).permute(0,1,2)
+
+        coord_map = transform(coord_map)
+
+        mask_im = transform(mask_im)
+
+        coord_map = coord_map.numpy().transpose(1,2,0)
+        mask_im = mask_im.numpy()[0]
+
     coord_map = coord_map[:, :, (2, 1, 0)]
 
-    masks, coords, class_ids = process_data(mask_im, coord_map, inst_dict, meta_path)
+    # masks, coords, class_ids = process_data(mask_im, coord_map, inst_dict, meta_path)
 
-    return masks, coords, class_ids
+    return mask_im,coord_map,inst_dict
 
 
 class TrainData(Dataset):
-    def __init__(self, img_dir):
+    def __init__(self, img_dir,transform = None):
         self.img_dir = img_dir
         self.img_annos = glob.glob(img_dir + '/**/*.txt', recursive = True)
+        self.transform = transform
 
     def __len__(self):
 
@@ -120,57 +135,158 @@ class TrainData(Dataset):
 
     def __getitem__(self, idx):
 
-        dumbo = self.img_annos[idx]
-        dumbo = dumbo.split('_')[0]
+        to_transform = torch.rand(1).item()
 
-        img_path = dumbo
+        img_path = self.img_annos[idx].split('_')[0]
 
         image = read_image(img_path+'_color.png')
-        
-        masks, coords, class_ids = load_mask(img_path)
 
-        sample = {'image':image,'masks':masks,'coords':coords,'class_ids':class_ids}
+        gamma = np.random.uniform(0.8, 1)
+        gain = np.random.uniform(0.8, 1)
+
+        image = TF.adjust_gamma(image,gamma,gain)
+        
+        if self.transform and to_transform > 0.5:
+            image = self.transform(image,is_img = True)
+            mask_im,coord_map,inst_dict = load_mask(img_path,self.transform)
+        else:
+            mask_im,coord_map,inst_dict = load_mask(img_path)
+
+
+        sample = {'image':image,'mask_im':mask_im,'coord_map':coord_map,'inst_dict':inst_dict}
 
         return sample
     
 def overlap_nocs(image,coords):
 
-    # mask_binary = np.max(masks,2)
     nocs_map = np.sum(coords,2)
     alpha = np.sum(nocs_map,2,keepdims = True)
     nocs_map_alpha = np.concatenate((nocs_map,alpha),axis=2)
 
-    # print(nocs_map.shape,alpha.shape)
-
-    plt.imshow(F.to_pil_image(image))
+    plt.imshow(TF.to_pil_image(image))
     plt.imshow(nocs_map_alpha)
     plt.pause(0.001)
+
+def largest_rotated_rect(w, h, angle):
+    """
+    Given a rectangle of size wxh that has been rotated by 'angle' (in
+    radians), computes the width and height of the largest possible
+    axis-aligned rectangle within the rotated rectangle.
+
+    Original JS code by 'Andri' and Magnus Hoff from Stack Overflow
+
+    Converted to Python by Aaron Snoswell
+    """
+
+    quadrant = int(math.floor(angle / (math.pi / 2))) & 3
+    sign_alpha = angle if ((quadrant & 1) == 0) else math.pi - angle
+    alpha = (sign_alpha % math.pi + math.pi) % math.pi
+
+    bb_w = w * math.cos(alpha) + h * math.sin(alpha)
+    bb_h = w * math.sin(alpha) + h * math.cos(alpha)
+
+    gamma = math.atan2(bb_w, bb_w) if (w < h) else math.atan2(bb_w, bb_w)
+
+    delta = math.pi - alpha - gamma
+
+    length = h if (w < h) else w
+
+    d = length * math.cos(alpha)
+    a = d * math.sin(alpha) / math.sin(delta)
+
+    y = a * math.cos(gamma)
+    x = y * math.tan(gamma)
+
+    return (
+        int(bb_w - 2 * x),
+        int(bb_h - 2 * y)
+    )
+
+class RotationCrop:
+    """Rotate by one of the given angles."""
+
+    def __init__(self):
+        self.angle = np.random.uniform(-5, 5)
+
+    def __call__(self, x,is_img = False):
+
+        if is_img:
+            rotated_x = TF.rotate(x,self.angle,expand = True,interpolation = InterpolationMode.BILINEAR)
+
+            rect = largest_rotated_rect(x.shape[-2], x.shape[-1], self.angle)
+
+            cropped_x = TF.center_crop(rotated_x,rect)
+
+            x_resized = TF.resize(cropped_x,(480,640),antialias = True,interpolation= InterpolationMode.BILINEAR)
+        else:
+            rotated_x = TF.rotate(x,self.angle,expand = True,interpolation = InterpolationMode.NEAREST)
+
+            rect = largest_rotated_rect(x.shape[-2], x.shape[-1], self.angle)
+
+            cropped_x = TF.center_crop(rotated_x,rect)
+
+            x_resized = TF.resize(cropped_x,(480,640),antialias = True,interpolation = InterpolationMode.NEAREST)
+
+        return x_resized
+    
+def show_batch(sample_batched):
+    """Show image with landmarks for a batch of samples."""
+    images_batch, nocs_batch = sample_batched['image'],sample_batched['coords']
+    batch_size = len(images_batch)
+
+    im_size = images_batch.size(2)
+
+    grid_border_size = 2
+
+    grid = utils.make_grid(images_batch)
+    plt.imshow(grid.numpy().transpose((1, 2, 0)))
+
+    # for i in range(batch_size):
+    #     plt.scatter(landmarks_batch[i, :, 0].numpy() + i * im_size + (i + 1) * grid_border_size,
+    #                 landmarks_batch[i, :, 1].numpy() + grid_border_size,
+    #                 s=10, marker='.', c='r')
+
+    #     plt.title('Batch from dataloader')
 
 
     
 def main():
 
-    trainset = TrainData('data/train')
+    rot = RotationCrop()
+    trainset = TrainData('data/train',transform=rot)
 
-    fig = plt.figure()
+    # fig = plt.figure()
 
-    for i in range(len(trainset)):
+    # for i in range(len(trainset)):
 
-        sample = trainset[i]
+    #     sample = trainset[i]
 
-        # print(i, sample['image'].shape, sample['masks'].shape)
+    #     ax = plt.subplot(1, 4, i + 1)
+    #     plt.tight_layout()
+    #     ax.set_title('Sample #{}'.format(i))
+    #     ax.axis('off')
+    #     overlap_nocs(sample['image'],sample['coords'])
 
-        ax = plt.subplot(1, 4, i + 1)
-        plt.tight_layout()
-        ax.set_title('Sample #{}'.format(i))
-        ax.axis('off')
-        overlap_nocs(sample['image'],sample['coords'])
-
-        if i == 3:
-            plt.show()
-            break
+    #     if i == 3:
+    #         plt.show()
+    #         break
     
-    trainloader = DataLoader(trainset, batch_size=4, shuffle=True)
+    trainloader = DataLoader(trainset, batch_size=4, shuffle=True, num_workers=0)
+
+    for i_batch, sample_batched in enumerate(trainloader):
+        print(i_batch, sample_batched['image'].size(),
+            sample_batched['coord_map'].size())
+
+    # observe 4th batch and stop.
+        # if i_batch == 3:
+        #     plt.figure()
+        #     show_batch(sample_batched)
+        #     plt.axis('off')
+        #     plt.ioff()
+        #     plt.show()
+        #     break
+
+    
 
 
     # while(1):
