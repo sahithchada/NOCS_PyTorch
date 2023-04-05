@@ -105,6 +105,13 @@ def load_mask(image_id,transform = None):
 
     coord_map = cv2.imread(coord_path)[:, :, :3]
 
+
+    cm2 = read_image(coord_path)[:, :, :3]
+    mm2  = read_image(mask_path)[:,:,2]
+
+    # print(mask_im.shape,mm2.shape)
+    # print(cm2.shape,coord_map.shape)
+
     if transform:
         coord_map = torch.tensor(coord_map).unsqueeze(0).permute(0,3,1,2)[0]
         mask_im = torch.tensor(mask_im).unsqueeze(0).permute(0,1,2)
@@ -121,6 +128,36 @@ def load_mask(image_id,transform = None):
     # masks, coords, class_ids = process_data(mask_im, coord_map, inst_dict, meta_path)
 
     return mask_im,coord_map,inst_dict
+
+def custom_collate(batch):
+    '''
+    Adds extra keys to a batch
+    '''
+    
+
+    batch_image = batch[0]['image'].unsqueeze(0)
+    batch_mask = np.expand_dims(batch[0]['mask_im'],0)
+    batch_coord = np.expand_dims(batch[0]['coord_map'],0)
+
+    # print(type(batch_image),type(batch_mask),type(batch_coord))
+
+    inst_dicts_list = []
+
+    if len(batch) > 1:
+
+        for i in range(1,len(batch)):
+
+            batch_image = torch.cat((batch_image,batch[i]['image'].unsqueeze(0)))
+            batch_mask = np.concatenate((batch_mask,np.expand_dims(batch[i]['mask_im'],0)))
+            batch_coord = np.concatenate((batch_coord,np.expand_dims(batch[i]['coord_map'],0)))
+
+            inst_dicts_list.append(batch[i]['inst_dict'])
+
+
+    batch_return = {'image':batch_image,'mask_im':batch_mask,'coord_map':batch_coord,'inst_dict':inst_dicts_list}
+
+
+    return batch_return
 
 
 class TrainData(Dataset):
@@ -147,13 +184,16 @@ class TrainData(Dataset):
         image = TF.adjust_gamma(image,gamma,gain)
         
         if self.transform and to_transform > 0.5:
-            image = self.transform(image,is_img = True)
-            mask_im,coord_map,inst_dict = load_mask(img_path,self.transform)
+            transform = RotationCrop()
+            image = transform(image,is_img = True)
+            mask_im,coord_map,inst_dict = load_mask(img_path,transform=transform)
         else:
             mask_im,coord_map,inst_dict = load_mask(img_path)
 
 
         sample = {'image':image,'mask_im':mask_im,'coord_map':coord_map,'inst_dict':inst_dict}
+
+        # sample = {'image':image,'mask_im':mask_im,'coord_map':coord_map}
 
         return sample
     
@@ -231,15 +271,20 @@ class RotationCrop:
     
 def show_batch(sample_batched):
     """Show image with landmarks for a batch of samples."""
-    images_batch, nocs_batch = sample_batched['image'],sample_batched['coords']
+    images_batch, nocs_batch = sample_batched['image'],sample_batched['coord_map']
     batch_size = len(images_batch)
 
     im_size = images_batch.size(2)
 
     grid_border_size = 2
 
+    print(nocs_batch.shape,images_batch.shape)
+    nocs_batch = torch.tensor(nocs_batch).permute(0,3,1,2)
+
     grid = utils.make_grid(images_batch)
+    grid2 = utils.make_grid(nocs_batch)
     plt.imshow(grid.numpy().transpose((1, 2, 0)))
+    plt.imshow(grid2.numpy().transpose((1, 2, 0)))
 
     # for i in range(batch_size):
     #     plt.scatter(landmarks_batch[i, :, 0].numpy() + i * im_size + (i + 1) * grid_border_size,
@@ -252,8 +297,8 @@ def show_batch(sample_batched):
     
 def main():
 
-    rot = RotationCrop()
-    trainset = TrainData('data/train',transform=rot)
+    
+    trainset = TrainData('data/train',transform=True)
 
     # fig = plt.figure()
 
@@ -271,20 +316,20 @@ def main():
     #         plt.show()
     #         break
     
-    trainloader = DataLoader(trainset, batch_size=4, shuffle=True, num_workers=0)
+    trainloader = DataLoader(trainset, batch_size=4, shuffle=True, num_workers=0,collate_fn=custom_collate)
 
     for i_batch, sample_batched in enumerate(trainloader):
-        print(i_batch, sample_batched['image'].size(),
-            sample_batched['coord_map'].size())
-
+        print(i_batch, sample_batched['image'].shape,
+            sample_batched['coord_map'].shape)
+ 
     # observe 4th batch and stop.
-        # if i_batch == 3:
-        #     plt.figure()
-        #     show_batch(sample_batched)
-        #     plt.axis('off')
-        #     plt.ioff()
-        #     plt.show()
-        #     break
+        if i_batch == 3:
+            plt.figure()
+            show_batch(sample_batched)
+            plt.axis('off')
+            plt.ioff()
+            plt.show()
+            break
 
     
 
