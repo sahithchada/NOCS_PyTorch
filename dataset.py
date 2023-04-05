@@ -14,7 +14,12 @@ from torchvision.transforms import InterpolationMode
 from torchvision import utils
 
 
-def process_data(mask_im, coord_map, inst_dict, meta_path):
+def process_data(mask_im, coord_map, inst_dict, path):
+
+    OBJ_MODEL_DIR = 'data/obj_models'
+    subset = 'train'
+    meta_path = path + '_meta.txt'
+
     # parsing mask
     cdata = mask_im
     cdata = np.array(cdata, dtype=np.int32)
@@ -53,17 +58,17 @@ def process_data(mask_im, coord_map, inst_dict, meta_path):
         if len(words) == 3:
             ## real scanned objs
             if words[2][-3:] == 'npz':
-                npz_path = os.path.join(self.config.OBJ_MODEL_DIR, 'real_val', words[2])
+                npz_path = os.path.join(OBJ_MODEL_DIR, 'real_val', words[2])
                 with np.load(npz_path) as npz_file:
                     scale_factor[i, :] = npz_file['scale']
             else:
-                bbox_file = os.path.join(self.config.OBJ_MODEL_DIR, 'real_'+self.subset, words[2]+'.txt')
+                bbox_file = os.path.join(OBJ_MODEL_DIR, 'real_'+subset, words[2]+'.txt')
                 scale_factor[i, :] = np.loadtxt(bbox_file)
 
             scale_factor[i, :] /= np.linalg.norm(scale_factor[i, :])
 
         else:
-            bbox_file = os.path.join(self.config.OBJ_MODEL_DIR, self.subset, words[2], words[3], 'bbox.txt')
+            bbox_file = os.path.join(OBJ_MODEL_DIR,subset, words[2], words[3], 'bbox.txt')
             bbox = np.loadtxt(bbox_file)
             scale_factor[i, :] = bbox[0, :] - bbox[1, :]
 
@@ -90,6 +95,7 @@ def process_data(mask_im, coord_map, inst_dict, meta_path):
 
         # class ids is also one-indexed
         class_ids[i] = inst_dict[inst_id]
+        scales[i, :] = scale_factor[inst_id - 1, :]
         i += 1
 
 
@@ -98,8 +104,9 @@ def process_data(mask_im, coord_map, inst_dict, meta_path):
     coords = np.clip(coords, 0, 1)
 
     class_ids = class_ids[:i]
+    scales = scales[:i]
 
-    return masks, coords, class_ids
+    return masks, coords, class_ids, scales
 
 
 def load_mask(image_id,transform = None):
@@ -129,13 +136,6 @@ def load_mask(image_id,transform = None):
 
     coord_map = cv2.imread(coord_path)[:, :, :3]
 
-
-    cm2 = read_image(coord_path)[:, :, :3]
-    mm2  = read_image(mask_path)[:,:,2]
-
-    # print(mask_im.shape,mm2.shape)
-    # print(cm2.shape,coord_map.shape)
-
     if transform:
         coord_map = torch.tensor(coord_map).unsqueeze(0).permute(0,3,1,2)[0]
         mask_im = torch.tensor(mask_im).unsqueeze(0).permute(0,1,2)
@@ -158,14 +158,14 @@ def custom_collate(batch):
     Adds extra keys to a batch
     '''
     
-
     batch_image = batch[0]['image'].unsqueeze(0)
     batch_mask = np.expand_dims(batch[0]['mask_im'],0)
     batch_coord = np.expand_dims(batch[0]['coord_map'],0)
 
     # print(type(batch_image),type(batch_mask),type(batch_coord))
 
-    inst_dicts_list = []
+    inst_dicts_list = [batch[0]['inst_dict']]
+    paths_list = [batch[0]['path']]
 
     if len(batch) > 1:
 
@@ -176,9 +176,10 @@ def custom_collate(batch):
             batch_coord = np.concatenate((batch_coord,np.expand_dims(batch[i]['coord_map'],0)))
 
             inst_dicts_list.append(batch[i]['inst_dict'])
+            paths_list.append(batch[i]['path'])
 
 
-    batch_return = {'image':batch_image,'mask_im':batch_mask,'coord_map':batch_coord,'inst_dict':inst_dicts_list}
+    batch_return = {'image':batch_image,'mask_im':batch_mask,'coord_map':batch_coord,'inst_dict':inst_dicts_list,'path':paths_list}
 
 
     return batch_return
@@ -215,9 +216,7 @@ class TrainData(Dataset):
             mask_im,coord_map,inst_dict = load_mask(img_path)
 
 
-        sample = {'image':image,'mask_im':mask_im,'coord_map':coord_map,'inst_dict':inst_dict}
-
-        # sample = {'image':image,'mask_im':mask_im,'coord_map':coord_map}
+        sample = {'image':image,'mask_im':mask_im,'coord_map':coord_map,'inst_dict':inst_dict,'path':img_path}
 
         return sample
     
@@ -306,60 +305,50 @@ def show_batch(sample_batched):
     nocs_batch = torch.tensor(nocs_batch).permute(0,3,1,2)
 
     alpha = (torch.sum(nocs_batch,1,keepdim=True) > 0.0) * 1.0
-    print(nocs_batch.shape,alpha.shape)
     res = torch.hstack((nocs_batch,alpha))
-    print(res.shape)
 
     grid = utils.make_grid(images_batch)
-    grid2 = utils.make_grid(nocs_batch)
-    # grid2 = utils.make_grid(res)
     plt.imshow(grid.numpy().transpose((1, 2, 0)))
-    plt.imshow(grid2.numpy().transpose((1, 2, 0)))
-
-    # for i in range(batch_size):
-    #     plt.scatter(landmarks_batch[i, :, 0].numpy() + i * im_size + (i + 1) * grid_border_size,
-    #                 landmarks_batch[i, :, 1].numpy() + grid_border_size,
-    #                 s=10, marker='.', c='r')
-
-    #     plt.title('Batch from dataloader')
-
-
     
 def main():
 
     
     trainset = TrainData('data/train',transform=True)
-
-    # fig = plt.figure()
-
-    # for i in range(len(trainset)):
-
-    #     sample = trainset[i]
-
-    #     ax = plt.subplot(1, 4, i + 1)
-    #     plt.tight_layout()
-    #     ax.set_title('Sample #{}'.format(i))
-    #     ax.axis('off')
-    #     overlap_nocs(sample['image'],sample['coords'])
-
-    #     if i == 3:
-    #         plt.show()
-    #         break
-    
-    trainloader = DataLoader(trainset, batch_size=4, shuffle=False, num_workers=0,collate_fn=custom_collate)
+    batch_sz = 2
+  
+    trainloader = DataLoader(trainset, batch_size=batch_sz, shuffle=True, num_workers=0,collate_fn=custom_collate)
 
     for i_batch, sample_batched in enumerate(trainloader):
-        print(i_batch, sample_batched['image'].shape,
-            sample_batched['coord_map'].shape)
- 
-    # observe 4th batch and stop.
-        if i_batch == 3:
-            plt.figure()
-            show_batch(sample_batched)
-            plt.axis('off')
-            plt.ioff()
+
+        # Here we get the batches of imgs, masks, coordmaps, and associated inst_dicts and paths for each img in batch
+        imgs_batch , mask_ims_batch, coord_maps_batch, inst_dicts_batch, paths_batch = sample_batched['image'],sample_batched['mask_im'],sample_batched['coord_map'],sample_batched['inst_dict'],sample_batched['path']
+
+        plt.figure()
+
+        # Next we go through the batch and get the mask, coords, class_ids, and scales of the objects we are interested in
+        for i in range(batch_sz):
+
+            print(paths_batch[i])
+
+            masks, coords, class_ids, scales  = process_data(mask_ims_batch[i], coord_maps_batch[i], inst_dicts_batch[i], paths_batch[i])            
+
+            if masks.shape[2] == 0:
+                plt.imshow(imgs_batch[i].permute(1,2,0))
+            else:
+                plt.figure(1)
+                plt.subplot(211)
+                plt.imshow(masks.max(2)) if masks.shape[2] != 0 else plt.imshow(masks.squeeze(2))
+                plt.subplot(212)
+                plt.imshow(coords.sum(2)) if coords.shape[2] != 0 else plt.imshow(coords.squeeze(2))
+
+
             plt.show()
-            break
+
+
+
+
+        # if i_batch == 1:
+        #     break
 
     
 
