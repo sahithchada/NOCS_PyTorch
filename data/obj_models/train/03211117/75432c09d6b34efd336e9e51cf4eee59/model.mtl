@@ -1,0 +1,8 @@
+newmtl Material.e6a6298ff53efe4150e122edc010a6a6
+Tr 0.0
+Kd 1 1 1
+map_Kd texture0.jpg
+newmtl Material.ff2b76dd9d013336f15786b2b7f09a50
+Tr 0.0
+Kd 1 1 1
+map_Kd texture1.png

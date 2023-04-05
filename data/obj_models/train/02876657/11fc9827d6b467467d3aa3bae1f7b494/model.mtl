@@ -1,0 +1,15 @@
+newmtl Material.57774a50243e5d429f3a4ea105ec3930
+d 0.74
+Tr 0.26
+Kd 0.243137 0.25098 0.243137
+newmtl Material.90b00bf69165eda831fe702671104217
+Tr 0.0
+Kd 0.6 0.0 0.0
+newmtl Material.fd405729217466f29eac93fc2fe0bd88
+Tr 0.0
+Kd 1 1 1
+map_Kd texture0.jpg
+newmtl Material.efc39ebbb3cc1048a02a4c783fdc17fc
+d 0.96
+Tr 0.04
+Kd 0.784314 0.035294 0.023529

@@ -1,0 +1,77 @@
+newmtl Material.e6a6298ff53efe4150e122edc010a6a6
+Tr 0.0
+Kd 1 1 1
+map_Kd texture0.jpg
+newmtl Material.90b00bf69165eda831fe702671104217
+Tr 0.0
+Kd 0.227451 0.227451 0.227451
+newmtl Material.dc7a3ca9ca091ddbf48733c3a604f557
+Tr 0.0
+Kd 0.117647 0.117647 0.117647
+newmtl Material.efc39ebbb3cc1048a02a4c783fdc17fc
+Tr 0.0
+Kd 1.0 1.0 1.0
+newmtl Material.b2cdaf4394d1a4f850458878b81c7fa1
+Tr 0.0
+Kd 1.0 1.0 1.0
+newmtl Material.1a9b9f2ffc3bd045e8f97d5062c1c924
+Tr 0.0
+Kd 0.854902 0.647059 0.12549
+newmtl Material.457f3cbb5359bc5462bef6febe38c6cd
+Tr 0.0
+Kd 0.776471 0.776471 0.776471
+newmtl Material.337c930ef1c2acf4c161ac14febc6f9c
+Tr 0.0
+Kd 1.0 0.0 0.0
+newmtl Material.8c7d1b3abfca6f8692ee4683f11c4d73
+Tr 0.0
+Kd 0.501961 0.501961 0.501961
+newmtl Material.3ac6031be7abcb165f3b2ce0a1a4e393
+Tr 0.0
+Kd 1.0 1.0 0.0
+newmtl Material.4bcf6946f61b866c6e1c4c177d1928e1
+Tr 0.0
+Kd 0.078431 0.078431 0.078431
+newmtl Material.1edc4efc065fd66b7de11d0149fb8886
+Tr 0.0
+Kd 0.0 0.0 0.0
+newmtl Material.e86aec41bbf76da0ab18b8747119ac94
+Tr 0.0
+Kd 0.666667 0.666667 0.666667
+newmtl Material.62ff90867a9537559b25e62803cbd5c4
+Tr 0.0
+Kd 0.168627 0.098039 0.098039
+newmtl Material.1281cd738cc857470a316a9f8bf5ad8e
+Tr 0.0
+Kd 0.137255 0.2 0.078431
+newmtl Material.416ba58cf20f46e7eb82b9e9e6d2021a
+d 0.68
+Tr 0.32
+Kd 0.227451 0.227451 0.227451
+newmtl Material.151e72ff4c4eb699ed7a8c6d01c39ec8
+Tr 0.0
+Kd 0.4 0.0 0.0
+newmtl Material.21cdf9a559b38030a790444bd385c3c4
+Tr 0.0
+Kd 0.752941 0.752941 0.752941
+newmtl Material.b02f34002ad4385997edbb6218796c41
+Tr 0.0
+Kd 0.156863 0.156863 0.4
+newmtl Material.2f8fcac0edf5ad098cdfb25ec5de67ef
+Tr 0.0
+Kd 0.156863 0.2 0.2
+newmtl Material.1331894f2a15c3a4609e66bb872b9d46
+Tr 0.0
+Kd 0.078431 0.078431 0.4
+newmtl Material.630c005caaee91842af7053b58b3b0af
+Tr 0.0
+Kd 0.156863 0.156863 0.2
+newmtl Material.11255c8d10f5591c67b9751dcec8ea6c
+d 0.57
+Tr 0.43
+Kd 1 1 1
+map_Kd texture1.jpg
+newmtl Material.3ac7f9cb659bad400c8fadb85cb8e4ca
+Tr 0.0
+Kd 1 1 1
+map_Kd texture2.jpg

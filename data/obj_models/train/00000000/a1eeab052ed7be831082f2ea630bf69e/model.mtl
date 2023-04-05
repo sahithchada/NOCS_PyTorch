@@ -1,0 +1,79 @@
+newmtl Material.57774a50243e5d429f3a4ea105ec3930
+Tr 0.0
+Kd 1.0 1.0 1.0
+newmtl Material.90b00bf69165eda831fe702671104217
+Tr 0.0
+Kd 0.886275 0.886275 0.886275
+newmtl Material.dc7a3ca9ca091ddbf48733c3a604f557
+Tr 0.0
+Kd 0.278431 0.278431 0.278431
+newmtl Material.b2cdaf4394d1a4f850458878b81c7fa1
+Tr 0.0
+Kd 0.886275 0.886275 0.886275
+newmtl Material.efc39ebbb3cc1048a02a4c783fdc17fc
+Tr 0.0
+Kd 0.0 0.0 0.0
+newmtl Material.1a9b9f2ffc3bd045e8f97d5062c1c924
+Tr 0.0
+Kd 0.117647 0.117647 0.117647
+newmtl Material.3ac6031be7abcb165f3b2ce0a1a4e393
+Tr 0.0
+Kd 0.447059 0.447059 0.447059
+newmtl Material.337c930ef1c2acf4c161ac14febc6f9c
+Tr 0.0
+Kd 0.227451 0.227451 0.227451
+newmtl Material.48987f08b7d994fa704781e9587bb07c
+Tr 0.0
+Kd 1 1 1
+map_Kd texture0.jpg
+newmtl Material.4fe956e77beb24b7022967a80fd190be
+Tr 0.0
+Kd 1 1 1
+map_Kd texture1.jpg
+newmtl Material.74205f402b46bf30a03c08fd47f7084e
+Tr 0.0
+Kd 1 1 1
+map_Kd texture2.jpg
+newmtl Material.151e72ff4c4eb699ed7a8c6d01c39ec8
+Tr 0.0
+Kd 1.0 0.94902 0.8
+newmtl Material.416ba58cf20f46e7eb82b9e9e6d2021a
+Tr 0.0
+Kd 0.886275 0.886275 0.886275
+newmtl Material.e86aec41bbf76da0ab18b8747119ac94
+Tr 0.0
+Kd 1.0 1.0 1.0
+newmtl Material.1edc4efc065fd66b7de11d0149fb8886
+Tr 0.0
+Kd 0.156863 0.117647 0.0
+newmtl Material.21cdf9a559b38030a790444bd385c3c4
+d 0.59
+Tr 0.41
+Kd 0.376471 0.376471 0.376471
+newmtl Material.e40fa9abb4590beb6e886ce6724b6c48
+Tr 0.0
+Kd 1 1 1
+map_Kd texture3.jpg
+newmtl Material.62ff90867a9537559b25e62803cbd5c4
+Tr 0.0
+Kd 0.639216 0.380392 0.121569
+newmtl Material.b02f34002ad4385997edbb6218796c41
+Tr 0.0
+Kd 0.776471 0.776471 0.776471
+newmtl Material.2f8fcac0edf5ad098cdfb25ec5de67ef
+Tr 0.0
+Kd 0.278431 0.278431 0.278431
+newmtl Material.eb85702ded218aa31d61e1feda7b30ee
+Tr 0.0
+Kd 1 1 1
+map_Kd texture4.jpg
+newmtl Material.630c005caaee91842af7053b58b3b0af
+Tr 0.0
+Kd 0.776471 0.776471 0.776471
+newmtl Material.8c892fb459378c85bb0251e617532192
+Tr 0.0
+Kd 1 1 1
+map_Kd texture5.jpg
+newmtl Material.bff05276d3376e3cfebbf78bc6b87580
+Tr 0.0
+Kd 0.2 0.2 0.2

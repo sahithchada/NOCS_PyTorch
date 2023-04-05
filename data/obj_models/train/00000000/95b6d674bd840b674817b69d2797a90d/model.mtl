@@ -1,0 +1,94 @@
+newmtl Material.3cdef1ad1aff8e3b0d11292d6ab4cb74
+Tr 0.0
+Kd 1 1 1
+map_Kd texture0.jpg
+newmtl Material.90b00bf69165eda831fe702671104217
+Tr 0.0
+Kd 1.0 0.941176 0.960784
+newmtl Material.b42c444fff6ce4f29d6d0eb1cea30dfc
+Tr 0.0
+Kd 1 1 1
+map_Kd texture2.jpg
+newmtl Material.13f2c38e0baa377d29c88e4555062c7e
+Tr 0.0
+Kd 1 1 1
+map_Kd texture1.jpg
+newmtl Material.1a9b9f2ffc3bd045e8f97d5062c1c924
+Tr 0.0
+Kd 0.501961 0.0 0.0
+newmtl Material.3ac6031be7abcb165f3b2ce0a1a4e393
+Tr 0.0
+Kd 0.501961 0.501961 0.501961
+newmtl Material.337c930ef1c2acf4c161ac14febc6f9c
+Tr 0.0
+Kd 0.0 0.0 0.0
+newmtl Material.8c7d1b3abfca6f8692ee4683f11c4d73
+Tr 0.0
+Kd 1.0 0.980392 0.980392
+newmtl Material.457f3cbb5359bc5462bef6febe38c6cd
+Tr 0.0
+Kd 1.0 1.0 1.0
+newmtl Material.4bcf6946f61b866c6e1c4c177d1928e1
+Tr 0.0
+Kd 0.862745 0.862745 0.862745
+newmtl Material.151e72ff4c4eb699ed7a8c6d01c39ec8
+Tr 0.0
+Kd 0.662745 0.662745 0.662745
+newmtl Material.416ba58cf20f46e7eb82b9e9e6d2021a
+Tr 0.0
+Kd 0.137255 0.137255 0.137255
+newmtl Material.7b2e9cdf5272b99d4005fa633b310955
+Tr 0.0
+Kd 1 1 1
+map_Kd texture3.jpg
+newmtl Material.69f3abe49118a391fba30c446467f133
+Tr 0.0
+Kd 1 1 1
+map_Kd texture4.jpg
+newmtl Material.2fc67daab6fe40055946bd3cf5d6f35b
+Tr 0.0
+Kd 1 1 1
+map_Kd texture5.jpg
+newmtl Material.747f66ae68d895af6b1debf2938a93a2
+Tr 0.0
+Kd 1 1 1
+map_Kd texture6.jpg
+newmtl Material.21cdf9a559b38030a790444bd385c3c4
+Tr 0.0
+Kd 1.0 1.0 0.0
+newmtl Material.eace5e159d5c67dfa35aa0640b5cd1d2
+d 0.6
+Tr 0.4
+Kd 1 1 1
+map_Kd texture7.jpg
+newmtl Material.5506ef75cd2789fdac175215269df883
+Tr 0.0
+Kd 1 1 1
+map_Kd texture8.jpg
+newmtl Material.6e2d8e44e7cfbfa75884a48ddf8a90db
+Tr 0.0
+Kd 1 1 1
+map_Kd texture9.jpg
+newmtl Material.630c005caaee91842af7053b58b3b0af
+Tr 0.0
+Kd 0.741176 0.717647 0.419608
+newmtl Material.ea32086df1506331f3882490b1052eb3
+Tr 0.0
+Kd 1 1 1
+map_Kd texture10.jpg
+newmtl Material.d76be803c0f619df824ce816610247f8
+Tr 0.0
+Kd 1 1 1
+map_Kd texture11.jpg
+newmtl Material.31596d9a1aa4fdbfb581d53b31ba3d80
+Tr 0.0
+Kd 0.878431 0.780392 0.65098
+newmtl Material.6c0275e094c8462efcb9f6164654454a
+Tr 0.0
+Kd 1.0 0.8 0.6
+newmtl Material.bdc618a25078cd106b4f6d3dd1702a3c
+Tr 0.0
+Kd 0.0 0.0 0.0
+newmtl Material.4037abac5f96c238e126d3bb923dd1ef
+Tr 0.0
+Kd 0.309804 0.14902 0.039216

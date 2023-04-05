@@ -1,0 +1,80 @@
+newmtl Material.57774a50243e5d429f3a4ea105ec3930
+Tr 0.0
+Kd 0.74902 0.74902 0.74902
+newmtl Material.90b00bf69165eda831fe702671104217
+Tr 0.0
+Kd 1.0 1.0 1.0
+newmtl Material.b2cdaf4394d1a4f850458878b81c7fa1
+Tr 0.0
+Kd 0.447059 0.447059 0.447059
+newmtl Material.1edc4efc065fd66b7de11d0149fb8886
+Tr 0.0
+Kd 0.756863 0.631373 0.0
+newmtl Material.62ff90867a9537559b25e62803cbd5c4
+Tr 0.0
+Kd 0.0 0.403922 0.607843
+newmtl Material.416ba58cf20f46e7eb82b9e9e6d2021a
+Tr 0.0
+Kd 0.607843 0.0 0.0
+newmtl Material.151e72ff4c4eb699ed7a8c6d01c39ec8
+Tr 0.0
+Kd 0.247059 0.247059 0.247059
+newmtl Material.337c930ef1c2acf4c161ac14febc6f9c
+Tr 0.0
+Kd 0.180392 0.54902 0.0
+newmtl Material.8c7d1b3abfca6f8692ee4683f11c4d73
+Tr 0.0
+Kd 0.247059 0.247059 0.247059
+newmtl Material.4bcf6946f61b866c6e1c4c177d1928e1
+Tr 0.0
+Kd 0.647059 0.647059 0.647059
+newmtl Material.1a9b9f2ffc3bd045e8f97d5062c1c924
+Tr 0.0
+Kd 0.956863 0.956863 0.956863
+newmtl Material.3ac6031be7abcb165f3b2ce0a1a4e393
+Tr 0.0
+Kd 0.066667 0.066667 0.066667
+newmtl Material.efc39ebbb3cc1048a02a4c783fdc17fc
+Tr 0.0
+Kd 0.956863 0.956863 0.956863
+newmtl Material.dc7a3ca9ca091ddbf48733c3a604f557
+Tr 0.0
+Kd 0.066667 0.066667 0.066667
+newmtl Material.21110491dc458f869ce9013fe1145a03
+Tr 0.0
+Kd 1 1 1
+map_Kd texture1.png
+newmtl Material.4fe956e77beb24b7022967a80fd190be
+Tr 0.0
+Kd 1 1 1
+map_Kd texture0.png
+newmtl Material.1281cd738cc857470a316a9f8bf5ad8e
+Tr 0.0
+Kd 1.0 1.0 1.0
+newmtl Material.17e44a98826ab1ededd21762def8e39f
+Tr 0.0
+Kd 1 1 1
+map_Kd texture2.png
+newmtl Material.e58ffe071679b58f82c48731fc9238ca
+Tr 0.0
+Kd 1 1 1
+map_Kd texture3.jpg
+newmtl Material.2f8fcac0edf5ad098cdfb25ec5de67ef
+Tr 0.0
+Kd 0.74902 0.74902 0.74902
+newmtl Material.2bb2a5a70ca21c5ee84c246f7687d604
+Tr 0.0
+Kd 1 1 1
+map_Kd texture4.png
+newmtl Material.1e33174a5ba6d9d2e4979b8ac1226ee3
+Tr 0.0
+Kd 1 1 1
+map_Kd texture5.png
+newmtl Material.01be3a5713dcefefa7bd65410531ba04
+Tr 0.0
+Kd 1 1 1
+map_Kd texture6.png
+newmtl Material.b1690aa2da11606714dd234184a21657
+Tr 0.0
+Kd 1 1 1
+map_Kd texture7.png

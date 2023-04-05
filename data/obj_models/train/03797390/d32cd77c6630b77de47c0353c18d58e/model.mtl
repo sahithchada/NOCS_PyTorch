@@ -1,0 +1,13 @@
+newmtl Material.57774a50243e5d429f3a4ea105ec3930
+Tr 0.0
+Kd 1.0 1.0 1.0
+newmtl Material.fab57047b918532a092dd588832f0228
+d 0.8
+Tr 0.2
+Kd 1 1 1
+map_Kd texture0.jpg
+newmtl Material.adfca2fb27c1e89c3ee819ce9372e850
+d 0.48
+Tr 0.52
+Kd 1 1 1
+map_Kd texture1.jpg

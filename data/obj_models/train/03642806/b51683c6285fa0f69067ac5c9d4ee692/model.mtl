@@ -1,0 +1,36 @@
+newmtl Material.57774a50243e5d429f3a4ea105ec3930
+Tr 0.0
+Kd 0.8 0.8 0.8
+newmtl Material.90b00bf69165eda831fe702671104217
+Tr 0.0
+Kd 0.701961 0.701961 0.701961
+newmtl Material.dc7a3ca9ca091ddbf48733c3a604f557
+Tr 0.0
+Kd 0.098039 0.098039 0.098039
+newmtl Material.b2cdaf4394d1a4f850458878b81c7fa1
+Tr 0.0
+Kd 1.0 1.0 1.0
+newmtl Material.a818cccec7dc645780971fb7a830405a
+Tr 0.0
+Kd 1 1 1
+map_Kd texture0.jpg
+newmtl Material.b3bc297251c60c47d0fa3fc128732808
+Tr 0.0
+Kd 1 1 1
+map_Kd texture1.jpg
+newmtl Material.71f67602c70904cec065d41f2ef38d00
+Tr 0.0
+Kd 1 1 1
+map_Kd texture2.jpg
+newmtl Material.78afdfe5c0d4086ced0d2fd6ab38cd0b
+Tr 0.0
+Kd 1 1 1
+map_Kd texture3.jpg
+newmtl Material.3b07427c442eefcdf6f8bb35f9755427
+Tr 0.0
+Kd 1 1 1
+map_Kd texture4.jpg
+newmtl Material.9a5ebc708abcaf923f9b20b1bf54d162
+Tr 0.0
+Kd 1 1 1
+map_Kd texture5.jpg

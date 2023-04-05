@@ -1,0 +1,86 @@
+newmtl Material.57774a50243e5d429f3a4ea105ec3930
+Tr 0.0
+Kd 0.0 0.0 0.0
+newmtl Material.a49e5dfbdd190ea8e66c9033ae5abc14
+Tr 0.0
+Kd 1 1 1
+map_Kd texture0.jpg
+newmtl Material.00ea7908160ece43dc2c1340125059c5
+Tr 0.0
+Kd 1 1 1
+map_Kd texture1.jpg
+newmtl Material.751824933f76bb5064d0ff5c0b0c11bb
+Tr 0.0
+Kd 1 1 1
+map_Kd texture2.jpg
+newmtl Material.1a9b9f2ffc3bd045e8f97d5062c1c924
+Tr 0.0
+Kd 1.0 0.0 0.0
+newmtl Material.dc7a3ca9ca091ddbf48733c3a604f557
+Tr 0.0
+Kd 1.0 1.0 1.0
+newmtl Material.d10c0f3722a96e11e14fffc59d8fb4eb
+Tr 0.0
+Kd 1 1 1
+map_Kd texture3.jpg
+newmtl Material.337c930ef1c2acf4c161ac14febc6f9c
+d 0.61
+Tr 0.39
+Kd 1.0 0.0 0.0
+newmtl Material.8c7d1b3abfca6f8692ee4683f11c4d73
+d 0.27
+Tr 0.73
+Kd 1.0 0.0 0.0
+newmtl Material.1281cd738cc857470a316a9f8bf5ad8e
+d 0.32
+Tr 0.68
+Kd 0.498039 1.0 0.0
+newmtl Material.d1728c39e7a342491b53bcf1c348db34
+d 0.8
+Tr 0.2
+Kd 1 1 1
+map_Kd texture6.jpg
+newmtl Material.01be3a5713dcefefa7bd65410531ba04
+d 0.8
+Tr 0.2
+Kd 1 1 1
+map_Kd texture5.jpg
+newmtl Material.151e72ff4c4eb699ed7a8c6d01c39ec8
+Tr 0.0
+Kd 0.0 0.0 0.0
+newmtl Material.416ba58cf20f46e7eb82b9e9e6d2021a
+Tr 0.0
+Kd 0.0 0.0 0.0
+newmtl Material.e86aec41bbf76da0ab18b8747119ac94
+Tr 0.0
+Kd 0.447059 0.447059 0.447059
+newmtl Material.b02f34002ad4385997edbb6218796c41
+d 0.08
+Tr 0.92
+Kd 0.501961 0.501961 0.501961
+newmtl Material.04a7b8dcc74671083b7126ab1a4233f7
+Tr 0.0
+Kd 1 1 1
+map_Kd texture4.jpg
+newmtl Material.2f8fcac0edf5ad098cdfb25ec5de67ef
+d 0.5
+Tr 0.5
+Kd 0.501961 0.501961 0.501961
+newmtl Material.630c005caaee91842af7053b58b3b0af
+Tr 0.0
+Kd 0.227451 0.227451 0.227451
+newmtl Material.1edc4efc065fd66b7de11d0149fb8886
+Tr 0.0
+Kd 0.498039 1.0 0.0
+newmtl Material.1331894f2a15c3a4609e66bb872b9d46
+Tr 0.0
+Kd 0.137255 0.137255 0.137255
+newmtl Material.62ff90867a9537559b25e62803cbd5c4
+Tr 0.0
+Kd 0.141176 0.184314 0.258824
+newmtl Material.457f3cbb5359bc5462bef6febe38c6cd
+Tr 0.0
+Kd 1.0 1.0 1.0
+newmtl Material.4bcf6946f61b866c6e1c4c177d1928e1
+Tr 0.0
+Kd 0.2 0.137255 0.117647

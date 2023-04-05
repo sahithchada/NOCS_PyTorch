@@ -1,0 +1,80 @@
+newmtl Material.57774a50243e5d429f3a4ea105ec3930
+Tr 0.0
+Kd 0.180392 0.0 0.368627
+newmtl Material.fd405729217466f29eac93fc2fe0bd88
+Tr 0.0
+Kd 1 1 1
+map_Kd texture0.jpg
+newmtl Material.b2cdaf4394d1a4f850458878b81c7fa1
+Tr 0.0
+Kd 1.0 1.0 1.0
+newmtl Material.fd24dcdf9df58f7e62cc7bb459327337
+Tr 0.0
+Kd 1 1 1
+map_Kd texture1.jpg
+newmtl Material.90b00bf69165eda831fe702671104217
+Tr 0.0
+Kd 1.0 1.0 1.0
+newmtl Material.457f3cbb5359bc5462bef6febe38c6cd
+Tr 0.0
+Kd 0.32549 0.0 0.666667
+newmtl Material.8c7d1b3abfca6f8692ee4683f11c4d73
+Tr 0.0
+Kd 0.32549 0.0 0.666667
+newmtl Material.f37e9bdd416db17c48a7965877331b22
+Tr 0.0
+Kd 1 1 1
+map_Kd texture2.jpg
+newmtl Material.3ac6031be7abcb165f3b2ce0a1a4e393
+Tr 0.0
+Kd 0.0 0.0 0.0
+newmtl Material.337c930ef1c2acf4c161ac14febc6f9c
+Tr 0.0
+Kd 0.6 0.196078 1.0
+newmtl Material.56e6d11fe7ee45bab69d19862c6749e0
+Tr 0.0
+Kd 1 1 1
+map_Kd texture3.jpg
+newmtl Material.e86aec41bbf76da0ab18b8747119ac94
+Tr 0.0
+Kd 0.329412 0.290196 0.243137
+newmtl Material.151e72ff4c4eb699ed7a8c6d01c39ec8
+Tr 0.0
+Kd 0.317647 0.270588 0.203922
+newmtl Material.416ba58cf20f46e7eb82b9e9e6d2021a
+Tr 0.0
+Kd 0.65098 0.564706 0.435294
+newmtl Material.08f477efd1779204ef523fcfcb9339ec
+Tr 0.0
+Kd 1 1 1
+map_Kd texture4.jpg
+newmtl Material.62ff90867a9537559b25e62803cbd5c4
+Tr 0.0
+Kd 0.117647 0.117647 0.117647
+newmtl Material.1281cd738cc857470a316a9f8bf5ad8e
+Tr 0.0
+Kd 0.666667 0.666667 0.666667
+newmtl Material.b902bbf802b598e9411383833982e0ab
+Tr 0.0
+Kd 1 1 1
+map_Kd texture5.jpg
+newmtl Material.1e33174a5ba6d9d2e4979b8ac1226ee3
+Tr 0.0
+Kd 1 1 1
+map_Kd texture6.jpg
+newmtl Material.01be3a5713dcefefa7bd65410531ba04
+Tr 0.0
+Kd 1 1 1
+map_Kd texture7.jpg
+newmtl Material.2f8fcac0edf5ad098cdfb25ec5de67ef
+Tr 0.0
+Kd 0.498039 1.0 0.0
+newmtl Material.bee22701c6fd29a887462dbba76004ad
+Tr 0.0
+Kd 0.156863 0.156863 0.8
+newmtl Material.21cdf9a559b38030a790444bd385c3c4
+Tr 0.0
+Kd 0.886275 0.886275 0.886275
+newmtl Material.b02f34002ad4385997edbb6218796c41
+Tr 0.0
+Kd 1.0 0.345098 0.0

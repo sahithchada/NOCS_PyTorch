@@ -14,7 +14,7 @@ from torchvision.transforms import InterpolationMode
 from torchvision import utils
 
 
-def process_data(mask_im, coord_map, inst_dict, meta_path, load_RT=False):
+def process_data(mask_im, coord_map, inst_dict, meta_path):
     # parsing mask
     cdata = mask_im
     cdata = np.array(cdata, dtype=np.int32)
@@ -42,6 +42,30 @@ def process_data(mask_im, coord_map, inst_dict, meta_path, load_RT=False):
     coords = np.zeros((h, w, num_instance, 3), dtype=np.float32)
     class_ids = np.zeros([num_instance], dtype=np.int_)
     scales = np.zeros([num_instance, 3], dtype=np.float32)
+
+    with open(meta_path, 'r') as f:
+        lines = f.readlines()
+
+    scale_factor = np.zeros((len(lines), 3), dtype=np.float32)
+    for i, line in enumerate(lines):
+        words = line[:-1].split(' ')
+        
+        if len(words) == 3:
+            ## real scanned objs
+            if words[2][-3:] == 'npz':
+                npz_path = os.path.join(self.config.OBJ_MODEL_DIR, 'real_val', words[2])
+                with np.load(npz_path) as npz_file:
+                    scale_factor[i, :] = npz_file['scale']
+            else:
+                bbox_file = os.path.join(self.config.OBJ_MODEL_DIR, 'real_'+self.subset, words[2]+'.txt')
+                scale_factor[i, :] = np.loadtxt(bbox_file)
+
+            scale_factor[i, :] /= np.linalg.norm(scale_factor[i, :])
+
+        else:
+            bbox_file = os.path.join(self.config.OBJ_MODEL_DIR, self.subset, words[2], words[3], 'bbox.txt')
+            bbox = np.loadtxt(bbox_file)
+            scale_factor[i, :] = bbox[0, :] - bbox[1, :]
 
     i = 0
 
@@ -278,11 +302,17 @@ def show_batch(sample_batched):
 
     grid_border_size = 2
 
-    print(nocs_batch.shape,images_batch.shape)
+    # print(nocs_batch.shape,images_batch.shape)
     nocs_batch = torch.tensor(nocs_batch).permute(0,3,1,2)
+
+    alpha = (torch.sum(nocs_batch,1,keepdim=True) > 0.0) * 1.0
+    print(nocs_batch.shape,alpha.shape)
+    res = torch.hstack((nocs_batch,alpha))
+    print(res.shape)
 
     grid = utils.make_grid(images_batch)
     grid2 = utils.make_grid(nocs_batch)
+    # grid2 = utils.make_grid(res)
     plt.imshow(grid.numpy().transpose((1, 2, 0)))
     plt.imshow(grid2.numpy().transpose((1, 2, 0)))
 
@@ -316,7 +346,7 @@ def main():
     #         plt.show()
     #         break
     
-    trainloader = DataLoader(trainset, batch_size=4, shuffle=True, num_workers=0,collate_fn=custom_collate)
+    trainloader = DataLoader(trainset, batch_size=4, shuffle=False, num_workers=0,collate_fn=custom_collate)
 
     for i_batch, sample_batched in enumerate(trainloader):
         print(i_batch, sample_batched['image'].shape,

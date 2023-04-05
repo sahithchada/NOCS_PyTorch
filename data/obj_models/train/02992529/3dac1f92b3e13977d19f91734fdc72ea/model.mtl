@@ -1,0 +1,96 @@
+newmtl Material.57774a50243e5d429f3a4ea105ec3930
+Tr 0.0
+Kd 0.776471 0.776471 0.776471
+newmtl Material.90b00bf69165eda831fe702671104217
+Tr 0.0
+Kd 1.0 1.0 1.0
+newmtl Material.090a554d081161e7156688c04af8d107
+Tr 0.0
+Kd 1 1 1
+map_Kd texture0.jpg
+newmtl Material.dc7a3ca9ca091ddbf48733c3a604f557
+Tr 0.0
+Kd 0.0 0.0 0.0
+newmtl Material.3ac6031be7abcb165f3b2ce0a1a4e393
+d 0.5
+Tr 0.5
+Kd 0.501961 0.501961 0.501961
+newmtl Material.b2cdaf4394d1a4f850458878b81c7fa1
+Tr 0.0
+Kd 0.447059 0.447059 0.447059
+newmtl Material.337c930ef1c2acf4c161ac14febc6f9c
+Tr 0.0
+Kd 0.337255 0.337255 0.337255
+newmtl Material.457f3cbb5359bc5462bef6febe38c6cd
+Tr 0.0
+Kd 0.0 0.0 1.0
+newmtl Material.8c7d1b3abfca6f8692ee4683f11c4d73
+Tr 0.0
+Kd 0.117647 0.117647 0.117647
+newmtl Material.1a9b9f2ffc3bd045e8f97d5062c1c924
+Tr 0.0
+Kd 0.117647 0.117647 0.2
+newmtl Material.ff2b76dd9d013336f15786b2b7f09a50
+Tr 0.0
+Kd 1 1 1
+map_Kd texture1.jpg
+newmtl Material.ae141de67439fec9a86dedfd68e5a3e7
+Tr 0.0
+Kd 1 1 1
+map_Kd texture2.jpg
+newmtl Material.d30f51e23068eabe6bec8992bc9a1804
+Tr 0.0
+Kd 1 1 1
+map_Kd texture3.jpg
+newmtl Material.1e8dbb1d654cf664f6d67dd78a49fa5a
+Tr 0.0
+Kd 1 1 1
+map_Kd texture4.jpg
+newmtl Material.278b54c13a17d04eff0ea91f33b02fb8
+Tr 0.0
+Kd 1 1 1
+map_Kd texture5.jpg
+newmtl Material.0c746daaf01bd0f535a575cd4a1b6f5c
+Tr 0.0
+Kd 1 1 1
+map_Kd texture6.jpg
+newmtl Material.aa65d2bacb46ec7d27267e737362eeb7
+Tr 0.0
+Kd 1 1 1
+map_Kd texture7.jpg
+newmtl Material.88ae9d232732a717e926c06cc1e0ef54
+Tr 0.0
+Kd 1 1 1
+map_Kd texture8.jpg
+newmtl Material.5dd0f26f8135c6ec43a975371b358f87
+Tr 0.0
+Kd 1 1 1
+map_Kd texture9.jpg
+newmtl Material.077fcc47cb62e146e1e43ad4fc95843d
+Tr 0.0
+Kd 1 1 1
+map_Kd texture10.jpg
+newmtl Material.ac65f94147b031f5c7b68f07cf7b3eab
+Tr 0.0
+Kd 1 1 1
+map_Kd texture11.jpg
+newmtl Material.e5c7e1677ed9ccfba7175ce88325a188
+Tr 0.0
+Kd 1 1 1
+map_Kd texture12.jpg
+newmtl Material.2d44db48be9394fa4523bb2c1a6dc17d
+Tr 0.0
+Kd 1 1 1
+map_Kd texture13.jpg
+newmtl Material.a8c6bdd51eae90c32ae7386b9fecbb23
+Tr 0.0
+Kd 1 1 1
+map_Kd texture14.jpg
+newmtl Material.55eeafeede4cf5f43f3378f47951f19e
+Tr 0.0
+Kd 1 1 1
+map_Kd texture15.jpg
+newmtl Material.f807d5a7a03c51593480cb9c163ed694
+Tr 0.0
+Kd 1 1 1
+map_Kd texture16.jpg
