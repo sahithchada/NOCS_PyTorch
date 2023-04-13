@@ -45,7 +45,22 @@ if config.GPU_COUNT:
     model = model.cuda()
 
 # Load weights trained on MS-COCO
-model.load_state_dict(torch.load(COCO_MODEL_PATH))
+pretrained_weights = torch.load(COCO_MODEL_PATH)
+model_state_dict = model.state_dict()
+for key in model_state_dict.keys():
+    if key in pretrained_weights:
+        # If the layer exists in pretrained weights, copy the weights
+        model_state_dict[key] = pretrained_weights[key]
+    else:
+        # If the layer does not exist in pretrained weights, initialize with random weights
+        shape = model_state_dict[key].shape
+        model_state_dict[key] = torch.randn(shape).normal_(mean=0, std=0.01)
+
+# Load the updated state dictionary into the model
+model.load_state_dict(model_state_dict)
+
+#model.load_state_dict(torch.load(COCO_MODEL_PATH))
+
 
 # COCO Class names
 # Index of the class in the list is its ID. For example, to get ID of
@@ -67,9 +82,15 @@ class_names = ['BG', 'person', 'bicycle', 'car', 'motorcycle', 'airplane',
                'teddy bear', 'hair drier', 'toothbrush']
 
 # Load a random image from the images folder
+'''
 file_names = next(os.walk(IMAGE_DIR))[2]
+image = skimage.io.imread(os.path.join(IMAGE_DIR, random.choice(file_names)))
+#image = skimage.io.imread(os.path.join(IMAGE_DIR, file_names[0]))
+'''
+#file_names = next(os.walk(IMAGE_DIR))[2]
+file_names = [f for f in os.listdir(IMAGE_DIR) if f.endswith(( '.jpg'))]
 #image = skimage.io.imread(os.path.join(IMAGE_DIR, random.choice(file_names)))
-image = skimage.io.imread(os.path.join(IMAGE_DIR, file_names[1]))
+image = skimage.io.imread(os.path.join(IMAGE_DIR, file_names[0]))
 
 
 # Run detection

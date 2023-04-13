@@ -148,6 +148,8 @@ class Config(object):
     # train the RPN.
     USE_RPN_ROIS = True
 
+    NUM_BINS=16
+
     def __init__(self):
         """Set values of computed attributes."""
         # Effective batch size

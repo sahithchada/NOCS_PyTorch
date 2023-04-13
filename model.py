@@ -1027,9 +1027,10 @@ class Mask(nn.Module):
     
 #working 
 # add net_name
-class fpn_coord_bins_graph(nn.Module):
-    def __init__(self,depth,image_shape, pool_size, num_classes, num_bins, net_name):
-        super(fpn_coord_bins_graph, self).__init__()
+#nocs head
+class Nocs_head_bins_wt_unshared(nn.Module):
+    def __init__(self,depth, pool_size,image_shape, num_classes, num_bins, net_name):
+        super(Nocs_head_bins_wt_unshared, self).__init__()
         self.pool_size = pool_size
         self.image_shape = image_shape
         self.num_classes = num_classes
@@ -1068,6 +1069,8 @@ class fpn_coord_bins_graph(nn.Module):
         x_feature = self.deconv(x)
         x = self.relu(x_feature)
         x = self.conv5(x)
+
+        x=x.view(x.shape[0], -1,self.num_bins, x.shape[2], x.shape[3])
         x = self.sigmoid(x)
 
         return x,x_feature
@@ -1489,6 +1492,23 @@ class Dataset(torch.utils.data.Dataset):
 #  MaskRCNN Class
 ############################################################
 
+class CoordBinValues(nn.Module):
+    def __init__(self, coord_num_bins):
+        super(CoordBinValues, self).__init__()
+        self.coord_num_bins = coord_num_bins
+
+    def forward(self, mrcnn_coord_bin):
+        mrcnn_coord_shape = mrcnn_coord_bin.shape
+        #mrcnn_coord_bin_reshape = mrcnn_coord_bin.view(-1, mrcnn_coord_shape[-1])
+        mrcnn_coord_bin_reshape = mrcnn_coord_bin.view(-1, mrcnn_coord_shape[2])
+
+        mrcnn_coord_bin_ind = torch.argmax(mrcnn_coord_bin_reshape, dim=-1)
+        mrcnn_coord_bin_value = mrcnn_coord_bin_ind.float() / self.coord_num_bins
+        #mrcnn_coord_bin_value = mrcnn_coord_bin_value.view(*mrcnn_coord_shape[0,2,3,4])
+        mrcnn_coord_bin_value = mrcnn_coord_bin_value.view(mrcnn_coord_shape[0], mrcnn_coord_shape[1], mrcnn_coord_shape[3], mrcnn_coord_shape[4])
+
+        return mrcnn_coord_bin_value
+
 class MaskRCNN(nn.Module):
     """Encapsulates the Mask RCNN model functionality.
     """
@@ -1546,6 +1566,10 @@ class MaskRCNN(nn.Module):
 
         # FPN Mask
         self.mask = Mask(256, config.MASK_POOL_SIZE, config.IMAGE_SHAPE, config.NUM_CLASSES)
+
+        self.nocs_head_x= Nocs_head_bins_wt_unshared(256, config.MASK_POOL_SIZE, config.IMAGE_SHAPE, config.NUM_CLASSES, config.NUM_BINS, 'coord_x')
+        self.nocs_head_y= Nocs_head_bins_wt_unshared(256, config.MASK_POOL_SIZE, config.IMAGE_SHAPE, config.NUM_CLASSES, config.NUM_BINS, 'coord_y')
+        self.nocs_head_z= Nocs_head_bins_wt_unshared(256, config.MASK_POOL_SIZE, config.IMAGE_SHAPE, config.NUM_CLASSES, config.NUM_BINS, 'coord_z')
 
         # Fix batch norm layers
         def set_bn_fix(m):
@@ -1686,23 +1710,37 @@ class MaskRCNN(nn.Module):
         #molded_images = Variable(molded_images, volatile=True)
 
         # Run object detection
-        detections, mrcnn_mask = self.predict([molded_images, image_metas], mode='inference')
+        detections, mrcnn_mask,mrcnn_coord_x,mrcnn_coord_y,mrcnn_coord_z = self.predict([molded_images, image_metas], mode='inference')
 
         # Convert to numpy
         detections = detections.data.cpu().numpy()
         mrcnn_mask = mrcnn_mask.permute(0, 1, 3, 4, 2).data.cpu().numpy()
 
+        mrcnn_coord_x=mrcnn_coord_x.permute(0, 1, 3, 4, 2).data.cpu().numpy()
+        mrcnn_coord_y=mrcnn_coord_y.permute(0, 1, 3, 4, 2).data.cpu().numpy()
+        mrcnn_coord_z=mrcnn_coord_z.permute(0, 1, 3, 4, 2).data.cpu().numpy()
+
+        max_coord_x = np.amax(mrcnn_coord_x)
+        max_coord_y = np.amax(mrcnn_coord_y)
+        max_coord_z = np.amax(mrcnn_coord_z)
+
+        print('predict result:')
+        print(max_coord_x, max_coord_y, max_coord_z)
+
+        mrcnn_coord = np.stack([mrcnn_coord_x, mrcnn_coord_y, mrcnn_coord_z], axis = -1)
+
         # Process detections
         results = []
         for i, image in enumerate(images):
-            final_rois, final_class_ids, final_scores, final_masks =\
-                self.unmold_detections(detections[i], mrcnn_mask[i],
+            final_rois, final_class_ids, final_scores, final_masks,final_coords =\
+                self.unmold_detections(detections[i], mrcnn_mask[i], mrcnn_coord[i],
                                        image.shape, windows[i])
             results.append({
                 "rois": final_rois,
                 "class_ids": final_class_ids,
                 "scores": final_scores,
                 "masks": final_masks,
+                "coords":final_coords
             })
         return results
 
@@ -1803,7 +1841,25 @@ class MaskRCNN(nn.Module):
             detections = detections.unsqueeze(0)
             mrcnn_mask = mrcnn_mask.unsqueeze(0)
 
-            return [detections, mrcnn_mask]
+            #using bins, unshared weights, not using deltas
+            #nocs inference
+            #self, depth, pool_size, image_shape, num_classes
+            #self,depth, pool_size,image_shape, num_classes, num_bins, net_name
+            mrcnn_coord_x_bin, mrcnn_coord_x_feature = self.nocs_head_x(mrcnn_feature_maps, detection_boxes)
+            mrcnn_coord_y_bin, mrcnn_coord_y_feature = self.nocs_head_y(mrcnn_feature_maps, detection_boxes )
+            mrcnn_coord_z_bin, mrcnn_coord_z_feature = self.nocs_head_z(mrcnn_feature_maps, detection_boxes)
+
+            coord_bin_values_module = CoordBinValues(self.config.NUM_BINS)
+            mrcnn_coord_x_bin_value = coord_bin_values_module(mrcnn_coord_x_bin)
+            mrcnn_coord_y_bin_value = coord_bin_values_module(mrcnn_coord_y_bin)
+            mrcnn_coord_z_bin_value = coord_bin_values_module(mrcnn_coord_z_bin)
+
+            mrcnn_coord_x_bin_value = mrcnn_coord_x_bin_value.unsqueeze(0)
+            mrcnn_coord_y_bin_value = mrcnn_coord_y_bin_value.unsqueeze(0)
+            mrcnn_coord_z_bin_value = mrcnn_coord_z_bin_value.unsqueeze(0)
+            
+
+            return [detections, mrcnn_mask,mrcnn_coord_x_bin_value,mrcnn_coord_y_bin_value,mrcnn_coord_z_bin_value]
 
         elif mode == 'training':
 
@@ -2113,13 +2169,14 @@ class MaskRCNN(nn.Module):
         windows = np.stack(windows)
         return molded_images, image_metas, windows
 
-    def unmold_detections(self, detections, mrcnn_mask, image_shape, window):
+    def unmold_detections(self, detections, mrcnn_mask,mrcnn_coord, image_shape, window):
         """Reformats the detections of one image from the format of the neural
         network output to a format suitable for use in the rest of the
         application.
 
         detections: [N, (y1, x1, y2, x2, class_id, score)]
         mrcnn_mask: [N, height, width, num_classes]
+        mrcnn_coord: [N, height, width, num_classes, 3]
         image_shape: [height, width, depth] Original size of the image before resizing
         window: [y1, x1, y2, x2] Box in the image where the real image is
                 excluding the padding.
@@ -2129,6 +2186,7 @@ class MaskRCNN(nn.Module):
         class_ids: [N] Integer class IDs for each bounding box
         scores: [N] Float probability scores of the class_id
         masks: [height, width, num_instances] Instance masks
+        coords: [height, width, num_instances]
         """
         # How many detections do we have?
         # Detections array is padded with zeros. Find the first class_id == 0.
@@ -2140,6 +2198,7 @@ class MaskRCNN(nn.Module):
         class_ids = detections[:N, 4].astype(np.int32)
         scores = detections[:N, 5]
         masks = mrcnn_mask[np.arange(N), :, :, class_ids]
+        coords = mrcnn_coord[np.arange(N), :, :, class_ids, :]
 
         # Compute scale and shift to translate coordinates to image domain.
         h_scale = image_shape[0] / (window[2] - window[0])
@@ -2161,18 +2220,23 @@ class MaskRCNN(nn.Module):
             class_ids = np.delete(class_ids, exclude_ix, axis=0)
             scores = np.delete(scores, exclude_ix, axis=0)
             masks = np.delete(masks, exclude_ix, axis=0)
+            coords = np.delete(coords, exclude_ix, axis=0)
             N = class_ids.shape[0]
 
         # Resize masks to original image size and set boundary threshold.
         full_masks = []
+        full_coords=[]
         for i in range(N):
             # Convert neural network mask to full size mask
             full_mask = utils.unmold_mask(masks[i], boxes[i], image_shape)
             full_masks.append(full_mask)
+            full_coord = utils.unmold_coord(coords[i], boxes[i], image_shape)
+            full_coords.append(full_coord)
+
         full_masks = np.stack(full_masks, axis=-1)\
             if full_masks else np.empty((0,) + masks.shape[1:3])
 
-        return boxes, class_ids, scores, full_masks
+        return boxes, class_ids, scores, full_masks,full_coords
 
 
 ############################################################
