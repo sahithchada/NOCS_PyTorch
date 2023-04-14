@@ -303,10 +303,11 @@ if __name__ == '__main__':
     os.environ['CUDA_VISIBLE_DEVICES']=args.gpu
     print('Using GPU {}.'.format(args.gpu))
 
-    config = Nocs_train_config
-    config.display()
+    config = Nocs_train_config()
+    #config.display()
 
     camera_train_dir = os.path.join('data', 'train')
+    camera_val_dir=os.path.join('data', 'val')
 
     #  real classes
     coco_names = ['BG', 'person', 'bicycle', 'car', 'motorcycle', 'airplane',
@@ -350,13 +351,45 @@ if __name__ == '__main__':
         coco_cls_ids.append(ind)
     config.display()
 
-    model = modellib.MaskRCNN(mode="training", config=config,model_dir=MODEL_DIR)
+    # Create an instance of your PyTorch MaskRCNN model with the given configuration
+    model = modellib.MaskRCNN(config=config, model_dir=MODEL_DIR)
+    # Load the state dictionary of the pre-trained model
+    pretrained_state_dict = torch.load(COCO_MODEL_PATH)
+    # List of layers to exclude, changed 
+    exclude_layers = ["mrcnn_class_logits", "mrcnn_bbox_fc", "mrcnn_bbox", "mrcnn_mask","mask","classifier"]
+    # Filter out the layers to exclude from the state dictionary
+    filtered_state_dict = {k: v for k, v in pretrained_state_dict.items() if not any(layer in k for layer in exclude_layers)}
+    # Load the modified state dictionary into your model
+    model.load_state_dict(filtered_state_dict, strict=False)
 
-    # initialise woth coco weights
-    model.load_weights(COCO_MODEL_PATH, by_name=True,exclude=["mrcnn_class_logits", "mrcnn_bbox_fc",
-                                                                "mrcnn_bbox", "mrcnn_mask"])
-    
+
+    #load data
     dataset_train = TrainData(camera_train_dir,transform = None)
+    dataset_val=TrainData(camera_val_dir,transform = None)
+
+
+
+    #print("Training network heads")
+    model.train_model(dataset_train, dataset_val,
+                learning_rate=config.LEARNING_RATE,
+                epochs=100,
+                layers='heads')
+
+    # Training - Stage 2
+    # Finetune layers from ResNet stage 4 and up
+    print("Training Resnet layer 4+")
+    model.train_model(dataset_train, dataset_val,
+                learning_rate=config.LEARNING_RATE/10,
+                epochs=130,
+                layers='4+')
+
+    # Training - Stage 3
+    # Finetune layers from ResNet stage 3 and up
+    print("Training Resnet layer 3+")
+    model.train_model(dataset_train, dataset_val,
+                learning_rate=config.LEARNING_RATE/100,
+                epochs=400,
+                layers='all')
     
 
 
