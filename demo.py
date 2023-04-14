@@ -100,5 +100,5 @@ results = model.detect([image])
 r = results[0]
 visualize.display_instances(image, r['rois'], r['masks'], r['class_ids'],
                             class_names, r['scores'])
-plt.savefig("output.png")
+plt.savefig("output_images/output.png")
 #plt.show()

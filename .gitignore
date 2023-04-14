@@ -1,0 +1,6 @@
+mask_rcnn_coco.pth
+.DS_Store
+.vscode
+__pycache__
+output_images
+models
