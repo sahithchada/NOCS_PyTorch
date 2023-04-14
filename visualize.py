@@ -75,8 +75,8 @@ def apply_mask(image, mask, color, alpha=0.5):
     return image
 
 
-def display_instances(image, boxes, masks, class_ids, class_names,
-                      scores=None, title="",
+def display_instances(image, boxes, masks, class_ids, class_names, fl_name,
+                      scores=None,title="",
                       figsize=(16, 16), ax=None):
     """
     boxes: [num_instance, (y1, x1, y2, x2, class_id)] in image coordinates.
@@ -145,7 +145,10 @@ def display_instances(image, boxes, masks, class_ids, class_names,
             p = Polygon(verts, facecolor="none", edgecolor=color)
             ax.add_patch(p)
     ax.imshow(masked_image.astype(np.uint8))
-    plt.savefig("output_images/visualise.png")
+
+    id = fl_name.split('_')[0]
+
+    plt.savefig("output_images/"+id+"_instances.png")
     #plt.show()
     
 
@@ -490,4 +493,15 @@ def plot_loss(loss, val_loss, save=True, log_dir=None):
         plt.show(block=False)
         plt.pause(0.1)
 
+def plot_nocs(coords,fl_name):
 
+    id = fl_name.split('_')[0]
+    out = np.zeros_like(coords[0])
+
+    for i in range(len(coords)):
+        out += coords[i]
+
+    plt.figure()
+    plt.imshow(out)
+
+    plt.savefig("output_images/"+id+"_coords.png")

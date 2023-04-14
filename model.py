@@ -84,7 +84,11 @@ def unique1d(tensor):
     if tensor.is_cuda:
         first_element = first_element.cuda()
     unique_bool = torch.cat((first_element, unique_bool),dim=0)
-    return tensor[unique_bool.data]
+
+    # This avoid torch.uint8 error
+    return tensor[unique_bool.to(torch.bool).data]
+
+    # return tensor[unique_bool.data]
 
 def intersect1d(tensor1, tensor2):
     aux = torch.cat((tensor1, tensor2),dim=0)
