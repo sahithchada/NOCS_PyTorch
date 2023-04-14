@@ -54,7 +54,7 @@ for key in model_state_dict.keys():
     else:
         # If the layer does not exist in pretrained weights, initialize with random weights
         shape = model_state_dict[key].shape
-        model_state_dict[key] = torch.randn(shape).normal_(mean=10, std=50.0)
+        model_state_dict[key] = torch.randn(shape).normal_(mean=0, std=3.0)
 
 # Load the updated state dictionary into the model
 model.load_state_dict(model_state_dict)
