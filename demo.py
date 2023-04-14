@@ -24,7 +24,7 @@ MODEL_DIR = os.path.join(ROOT_DIR, "logs")
 # Path to trained weights file
 # Download this file and place in the root of your
 # project (See README file for details)
-COCO_MODEL_PATH = os.path.join(ROOT_DIR, "mask_rcnn_coco.pth")
+COCO_MODEL_PATH = os.path.join(ROOT_DIR, "models/mask_rcnn_coco.pth")
 
 # Directory of images to run detection on
 IMAGE_DIR = os.path.join(ROOT_DIR, "images")
