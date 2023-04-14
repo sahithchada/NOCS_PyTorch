@@ -288,7 +288,7 @@ class RotationCrop:
 
             cropped_x = TF.center_crop(rotated_x,rect)
 
-            x_resized = TF.resize(cropped_x,(480,640),antialias = True,interpolation = InterpolationMode.NEAREST)
+            x_resized = TF.resize(cropped_x,(480,640),antialias = False,interpolation = InterpolationMode.NEAREST)
 
         return x_resized
     
