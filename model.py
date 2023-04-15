@@ -1250,9 +1250,17 @@ def load_image_gt(dataset, config, image_id, augment=False,
         of the image unless use_mini_mask is True, in which case they are
         defined in MINI_MASK_SHAPE.
     """
+
+    if augment and dataset.subset == 'train':
+        image, masks, coords, class_ids, scales, domain_label = dataset.load_augment_data(image_id)
+    else:
+        image = dataset.load_image(image_id)
+        masks, coords, class_ids, scales, domain_label = dataset.load_mask(image_id)
+    
+
     # Load image and mask
-    image = dataset.load_image(image_id)
-    mask, class_ids = dataset.load_mask(image_id)
+    # image = dataset.load_image(image_id)
+    # mask, class_ids = dataset.load_mask(image_id)
     shape = image.shape
     image, window, scale, padding = utils.resize_image(
         image,
@@ -1260,12 +1268,13 @@ def load_image_gt(dataset, config, image_id, augment=False,
         max_dim=config.IMAGE_MAX_DIM,
         padding=config.IMAGE_PADDING)
     mask = utils.resize_mask(mask, scale, padding)
+    coord = utils.resize_mask(coord, scale, padding)
 
     # Random horizontal flips.
-    if augment:
-        if random.randint(0, 1):
-            image = np.fliplr(image)
-            mask = np.fliplr(mask)
+    # if augment:
+    #     if random.randint(0, 1):
+    #         image = np.fliplr(image)
+    #         mask = np.fliplr(mask)
 
     # Bounding boxes. Note that some boxes might be all zeros
     # if the corresponding mask got cropped out.

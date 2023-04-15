@@ -309,7 +309,9 @@ def show_batch(sample_batched):
 
     grid = utils.make_grid(images_batch)
     plt.imshow(grid.numpy().transpose((1, 2, 0)))
-    
+
+
+
 def main():
 
     

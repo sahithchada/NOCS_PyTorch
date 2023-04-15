@@ -150,6 +150,8 @@ class Config(object):
 
     NUM_BINS=16
 
+    OBJ_MODEL_DIR = os.path.join('data','obj_models')
+
     def __init__(self):
         """Set values of computed attributes."""
         # Effective batch size
