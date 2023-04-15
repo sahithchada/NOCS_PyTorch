@@ -84,8 +84,8 @@ class Config(object):
 
     # If enabled, resizes instance masks to a smaller size to reduce
     # memory load. Recommended when using high-resolution images.
-    USE_MINI_MASK = True
-    MINI_MASK_SHAPE = (56, 56)  # (height, width) of the mini-mask
+    USE_MINI_MASK = False
+    MINI_MASK_SHAPE = (28, 28)  # (height, width) of the mini-mask
 
     # Input image resing
     # Images are resized such that the smallest side is >= IMAGE_MIN_DIM and

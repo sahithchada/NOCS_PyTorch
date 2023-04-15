@@ -324,18 +324,43 @@ def resize_image(image, min_dim=None, max_dim=None, padding=False):
     return image, window, scale, padding
 
 
+# def resize_mask(mask, scale, padding):
+#     """Resizes a mask using the given scale and padding.
+#     Typically, you get the scale and padding from resize_image() to
+#     ensure both, the image and the mask, are resized consistently.
+
+#     scale: mask scaling factor
+#     padding: Padding to add to the mask in the form
+#             [(top, bottom), (left, right), (0, 0)]
+#     """
+#     print(mask.shape)
+#     h, w = mask.shape[:2]
+#     mask = scipy.ndimage.zoom(mask, zoom=[scale, scale, 1], order=0)
+#     mask = np.pad(mask, padding, mode='constant', constant_values=0)
+#     return mask
+
 def resize_mask(mask, scale, padding):
     """Resizes a mask using the given scale and padding.
     Typically, you get the scale and padding from resize_image() to
-    ensure both, the image and the mask, are resized consistently.
-
+    ensure both, the image, the mask, and the coordinate map are resized consistently.
     scale: mask scaling factor
     padding: Padding to add to the mask in the form
             [(top, bottom), (left, right), (0, 0)]
     """
     h, w = mask.shape[:2]
-    mask = scipy.ndimage.zoom(mask, zoom=[scale, scale, 1], order=0)
-    mask = np.pad(mask, padding, mode='constant', constant_values=0)
+    # for instance mask
+    if len(mask.shape) == 3:
+        mask = scipy.ndimage.zoom(mask, zoom=[scale, scale, 1], order=0)
+        new_padding = padding
+    # for coordinate map
+    elif len(mask.shape) == 4:
+        mask = scipy.ndimage.zoom(mask, zoom=[scale, scale, 1, 1], order=0)
+        new_padding = padding + [(0, 0)]
+    else:
+        assert False
+
+    mask = np.pad(mask, new_padding, mode='constant', constant_values=0)
+
     return mask
 
 
