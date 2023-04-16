@@ -1235,7 +1235,7 @@ def compute_losses(rpn_match, rpn_bbox, rpn_class_logits, rpn_pred_bbox, target_
 ############################################################
 
 def load_image_gt(dataset, config, image_id, augment=False,
-                  use_mini_mask=False):
+                  use_mini_mask=False,load_scale = False):
     """Load and return ground truth data for an image (image, mask, bounding boxes).
 
     augment: If true, apply random image augmentation. Currently, only
@@ -1286,6 +1286,9 @@ def load_image_gt(dataset, config, image_id, augment=False,
     # bbox: [num_instances, (y1, x1, y2, x2)]
     bbox = utils.extract_bboxes(mask)
 
+    # Add class_id as the last value in bbox
+    bbox = np.hstack((bbox, class_ids[:, np.newaxis]))
+
     # Active classes
     # Different datasets have different classes, so track the
     # classes supported in the dataset of this image.
@@ -1303,9 +1306,14 @@ def load_image_gt(dataset, config, image_id, augment=False,
     # Image meta data
     image_meta = compose_image_meta(image_id, shape, window, active_class_ids)
 
-    return image, image_meta, class_ids, bbox, mask
+    # return image, image_meta, class_ids, bbox, mask
 
-def build_rpn_targets(image_shape, anchors, gt_class_ids, gt_boxes, config):
+    if load_scale:
+        return image, image_meta, bbox, mask, coord, domain_label, scales
+    else:
+        return image, image_meta, bbox, mask, coord, domain_label
+
+def build_rpn_targets_old(image_shape, anchors, gt_class_ids, gt_boxes, config):
     """Given the anchors and GT boxes, compute overlaps and identify positive
     anchors and deltas to refine them to match their corresponding GT boxes.
 
@@ -1415,6 +1423,105 @@ def build_rpn_targets(image_shape, anchors, gt_class_ids, gt_boxes, config):
 
     return rpn_match, rpn_bbox
 
+def build_rpn_targets(image_shape, anchors, gt_boxes, config):
+    """Given the anchors and GT boxes, compute overlaps and identify positive
+    anchors and deltas to refine them to match their corresponding GT boxes.
+
+    anchors: [num_anchors, (y1, x1, y2, x2)]
+    gt_boxes: [num_gt_boxes, (y1, x1, y2, x2, class_id)]
+
+    Returns:
+    rpn_match: [N] (int32) matches between anchors and GT boxes.
+               1 = positive anchor, -1 = negative anchor, 0 = neutral
+    rpn_bbox: [N, (dy, dx, log(dh), log(dw))] Anchor bbox deltas.
+    """
+    # RPN Match: 1 = positive anchor, -1 = negative anchor, 0 = neutral
+    rpn_match = np.zeros([anchors.shape[0]], dtype=np.int32)
+    # RPN bounding boxes: [max anchors per image, (dy, dx, log(dh), log(dw))]
+    rpn_bbox = np.zeros((config.RPN_TRAIN_ANCHORS_PER_IMAGE, 4))
+
+    # Areas of anchors and GT boxes
+    gt_box_area = (gt_boxes[:, 2] - gt_boxes[:, 0]) * (gt_boxes[:, 3] - gt_boxes[:, 1])
+    anchor_area = (anchors[:, 2] - anchors[:, 0]) * (anchors[:, 3] - anchors[:, 1])
+
+    # Compute overlaps [num_anchors, num_gt_boxes]
+    # Each cell contains the IoU of an anchor and GT box.
+    overlaps = np.zeros((anchors.shape[0], gt_boxes.shape[0]))
+    for i in range(overlaps.shape[1]):
+        gt = gt_boxes[i][:4]
+        overlaps[:,i] = utils.compute_iou(gt, anchors, gt_box_area[i], anchor_area)
+
+    # Match anchors to GT Boxes
+    # If an anchor overlaps a GT box with IoU >= 0.7 then it's positive.
+    # If an anchor overlaps a GT box with IoU < 0.3 then it's negative.
+    # Neutral anchors are those that don't match the conditions above, 
+    # and they don't influence the loss function.
+    # However, don't keep any GT box unmatched (rare, but happens). Instead,
+    # match it to the closest anchor (even if its max IoU is < 0.3).
+    #
+    # 1. Set negative anchors first. It gets overwritten if a gt box is matched to them.
+    anchor_iou_argmax = np.argmax(overlaps, axis=1)
+    anchor_iou_max = overlaps[np.arange(overlaps.shape[0]), anchor_iou_argmax]
+    rpn_match[anchor_iou_max < 0.3] = -1
+    # 2. Set an anchor for each GT box (regardless of IoU value).
+    # TODO: If multiple anchors have the same IoU match all of them
+    gt_iou_argmax = np.argmax(overlaps, axis=0)
+    rpn_match[gt_iou_argmax] = 1
+    # 3. Set anchors with high overlap as positive.
+    rpn_match[anchor_iou_max >= 0.7] = 1
+
+    # Subsample to balance positive and negative anchors
+    # Don't let positives be more than half the anchors
+    ids = np.where(rpn_match == 1)[0]
+    extra = len(ids) - (config.RPN_TRAIN_ANCHORS_PER_IMAGE // 2)
+    if extra > 0:
+        # Reset the extra ones to neutral
+        ids = np.random.choice(ids, extra, replace=False)
+        rpn_match[ids] = 0
+    # Same for negative proposals
+    ids = np.where(rpn_match == -1)[0]
+    extra = len(ids) - (config.RPN_TRAIN_ANCHORS_PER_IMAGE - np.sum(rpn_match == 1))
+    if extra > 0:
+        # Rest the extra ones to neutral
+        ids = np.random.choice(ids, extra, replace=False)
+        rpn_match[ids] = 0
+
+    # For positive anchors, compute shift and scale needed to transform them
+    # to match the corresponding GT boxes.
+    ids = np.where(rpn_match == 1)[0]
+    ix = 0  # index into rpn_bbox
+    # TODO: use box_refinment() rather that duplicating the code here
+    for i, a in zip(ids, anchors[ids]):
+        # Closest gt box (it might have IoU < 0.7)
+        gt = gt_boxes[anchor_iou_argmax[i], :4]
+
+        # Convert coordinates to center plus width/height.
+        # GT Box
+        gt_h = gt[2] - gt[0]
+        gt_w = gt[3] - gt[1]
+        gt_center_y = gt[0] + 0.5 * gt_h
+        gt_center_x = gt[1] + 0.5 * gt_w
+        # Anchor
+        a_h = a[2] - a[0]
+        a_w = a[3] - a[1]
+        a_center_y = a[0] + 0.5 * a_h
+        a_center_x = a[1] + 0.5 * a_w
+
+        # Compute the bbox refinement that the RPN should predict.
+        rpn_bbox[ix] = [
+            (gt_center_y - a_center_y) / a_h,
+            (gt_center_x - a_center_x) / a_w,
+            np.log(gt_h / a_h),
+            np.log(gt_w / a_w),
+        ]
+        # Normalize
+        rpn_bbox[ix] /= config.RPN_BBOX_STD_DEV
+        ix += 1
+
+    return rpn_match, rpn_bbox
+
+
+
 class Dataset(torch.utils.data.Dataset):
     def __init__(self, dataset, config, augment=True):
         """A generator that returns images and corresponding target class ids,
@@ -1464,19 +1571,25 @@ class Dataset(torch.utils.data.Dataset):
     def __getitem__(self, image_index):
         # Get GT bounding boxes and masks for image.
         image_id = self.image_ids[image_index]
-        image, image_metas, gt_class_ids, gt_boxes, gt_masks = \
+        # image, image_metas, gt_class_ids, gt_boxes, gt_masks = \
+        #     load_image_gt(self.dataset, self.config, image_id, augment=self.augment,
+        #                   use_mini_mask=self.config.USE_MINI_MASK)
+        
+        image, image_metas, gt_boxes, gt_masks, gt_coords, gt_domain_label = \
             load_image_gt(self.dataset, self.config, image_id, augment=self.augment,
                           use_mini_mask=self.config.USE_MINI_MASK)
 
         # Skip images that have no instances. This can happen in cases
         # where we train on a subset of classes and the image doesn't
         # have any of the classes we care about.
-        if not np.any(gt_class_ids > 0):
+        # if not np.any(gt_class_ids > 0):
+        #     return None
+        
+        if np.sum(gt_boxes) <= 0:
             return None
 
         # RPN Targets
-        rpn_match, rpn_bbox = build_rpn_targets(image.shape, self.anchors,
-                                                gt_class_ids, gt_boxes, self.config)
+        rpn_match, rpn_bbox = build_rpn_targets(image.shape, self.anchors, gt_boxes, self.config)
 
         # If more instances than fits in the array, sub-sample from them.
         if gt_boxes.shape[0] > self.config.MAX_GT_INSTANCES:
@@ -1489,6 +1602,7 @@ class Dataset(torch.utils.data.Dataset):
         # Add to batch
         rpn_match = rpn_match[:, np.newaxis]
         images = mold_image(image.astype(np.float32), self.config)
+        gt_class_ids = gt_boxes[:,-1]
 
         # Convert
         images = torch.from_numpy(images.transpose(2, 0, 1)).float()
@@ -1498,8 +1612,10 @@ class Dataset(torch.utils.data.Dataset):
         gt_class_ids = torch.from_numpy(gt_class_ids)
         gt_boxes = torch.from_numpy(gt_boxes).float()
         gt_masks = torch.from_numpy(gt_masks.astype(int).transpose(2, 0, 1)).float()
+        gt_coords = torch.from_numpy(gt_coords)
+        # gt_domain_label = torch.from_numpy(gt_domain_label)
 
-        return images, image_metas, rpn_match, rpn_bbox, gt_class_ids, gt_boxes, gt_masks
+        return images, image_metas, rpn_match, rpn_bbox, gt_class_ids, gt_boxes, gt_masks, gt_coords, gt_domain_label
 
     def __len__(self):
         return self.image_ids.shape[0]
@@ -1886,7 +2002,7 @@ class MaskRCNN(nn.Module):
         elif mode == 'training':
 
             gt_class_ids = input[2]
-            gt_boxes = input[3]
+            gt_boxes = input[3][:,:,:-1]
             gt_masks = input[4]
 
             # Normalize coordinates
@@ -2022,6 +2138,8 @@ class MaskRCNN(nn.Module):
             gt_class_ids = inputs[4]
             gt_boxes = inputs[5]
             gt_masks = inputs[6]
+            gt_coords = inputs[7]
+            gt_domain_label = inputs[8]
 
             # image_metas as numpy array
             image_metas = image_metas.numpy()

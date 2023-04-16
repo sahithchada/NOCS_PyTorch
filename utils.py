@@ -174,27 +174,54 @@ class Dataset(object):
         return ""
 
     def prepare(self, class_map=None):
-        """Prepares the Dataset class for use.
-
-        TODO: class map is not supported yet. When done, it should handle mapping
-              classes from different datasets to the same class ID.
+        """Prepares the Dataset class for use.d
         """
         def clean_name(name):
             """Returns a shorter version of object names for cleaner display."""
             return ",".join(name.split(",")[:1])
 
         # Build (or rebuild) everything else from the info dicts.
-        self.num_classes = len(self.class_info)
-        self.class_ids = np.arange(self.num_classes)
-        self.class_names = [clean_name(c["name"]) for c in self.class_info]
+        #self.num_classes = len(self.class_info)
+        self.num_classes = 0
+
+        #self.class_ids = np.arange(self.num_classes)
+        self.class_ids = []
+
+        #self.class_names = [clean_name(c["name"]) for c in self.class_info]
+        self.class_names = []
+
+
+        #self.class_from_source_map = {"{}.{}".format(info['source'], info['id']): id
+        #                              for info, id in zip(self.class_info, self.class_ids)}
+        self.class_from_source_map = {}
+
+        for cls_info in self.class_info:
+            source = cls_info["source"]
+            if source == 'coco':
+                map_key = "{}.{}".format(cls_info['source'], cls_info['id'])
+                self.class_from_source_map[map_key] = self.class_names.index(class_map[cls_info["name"]])
+            else:
+                self.class_ids.append(self.num_classes)
+                self.num_classes += 1
+                self.class_names.append(cls_info["name"])
+
+                map_key = "{}.{}".format(cls_info['source'], cls_info['id'])
+                self.class_from_source_map[map_key] = self.class_ids[-1]
+
+
         self.num_images = len(self.image_info)
         self._image_ids = np.arange(self.num_images)
 
-        self.class_from_source_map = {"{}.{}".format(info['source'], info['id']): id
-                                      for info, id in zip(self.class_info, self.class_ids)}
+
+        # Mapping from source class and image IDs to internal IDs
+        self.image_from_source_map = {"{}.{}".format(info['source'], info['id']): id
+                                      for info, id in zip(self.image_info, self.image_ids)}
 
         # Map sources to class_ids they support
         self.sources = list(set([i['source'] for i in self.class_info]))
+
+
+        '''
         self.source_class_ids = {}
         # Loop over datasets
         for source in self.sources:
@@ -204,6 +231,11 @@ class Dataset(object):
                 # Include BG class in all datasets
                 if i == 0 or source == info['source']:
                     self.source_class_ids[source].append(i)
+        '''
+
+        print(self.class_names)
+        print(self.class_from_source_map)
+        print(self.sources)
 
     def map_source_class_id(self, source_class_id):
         """Takes a source class ID and returns the int class ID assigned to it.
@@ -211,7 +243,7 @@ class Dataset(object):
         For example:
         dataset.map_source_class_id("coco.12") -> 23
         """
-        return self.class_from_source_map[source_class_id]
+        return self.class_from_source_map[source_class_id] if source_class_id in self.class_from_source_map else None
 
     def get_source_class_id(self, class_id, source):
         """Map an internal class ID to the corresponding class ID in the source dataset."""
