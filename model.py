@@ -486,6 +486,8 @@ def pyramid_roi_align(inputs, pool_size, image_shape):
         level_boxes[:,[0, 2]]*= image_shape[0]
         level_boxes[:,[1,3]]*=image_shape[1]
         indexes = torch.zeros(level_boxes.shape[0], 1)
+        if level_boxes.is_cuda:
+            indexes = indexes.cuda()
         level_boxes = torch.cat((indexes, level_boxes), dim=1)
         if level_boxes.is_cuda:
             ind = ind.cuda()
@@ -669,6 +671,9 @@ def detection_target_layer(proposals, gt_class_ids, gt_boxes, gt_masks, config):
 
         level_boxes = boxes[:, [1, 0, 3, 2]].clone()
         indexes = torch.zeros(level_boxes.shape[0], 1)
+        if config.GPU_COUNT:
+            indexes = indexes.cuda()
+
         level_boxes = torch.cat((indexes, level_boxes), dim=1)
         n,h,w=roi_masks.shape
         feature_maps_reshaped = torch.reshape(roi_masks.unsqueeze(1), (1,n, h,w))
@@ -1647,6 +1652,11 @@ class MaskRCNN(nn.Module):
         # Directory for training logs
         self.log_dir = os.path.join(self.model_dir, "{}{:%Y%m%dT%H%M}".format(
             self.config.NAME.lower(), now))
+        
+        # Check if folder exists
+        if not os.path.exists(self.log_dir):
+            # Create folder
+            os.makedirs(self.log_dir)
 
         # Path to save after each epoch. Include placeholders that get filled by Keras.
         self.checkpoint_path = os.path.join(self.log_dir, "mask_rcnn_{}_*epoch*.pth".format(
@@ -1947,13 +1957,16 @@ class MaskRCNN(nn.Module):
 
         # Data generators
         train_set = Dataset(train_dataset, self.config, augment=True)
-        train_generator = torch.utils.data.DataLoader(train_set, batch_size=1, shuffle=True, num_workers=4)
+        train_generator = torch.utils.data.DataLoader(train_set, batch_size=1, shuffle=False, num_workers=4)
         val_set = Dataset(val_dataset, self.config, augment=True)
-        val_generator = torch.utils.data.DataLoader(val_set, batch_size=1, shuffle=True, num_workers=4)
+        val_generator = torch.utils.data.DataLoader(val_set, batch_size=1, shuffle=False, num_workers=4)
 
         # Train
         log("\nStarting at epoch {}. LR={}\n".format(self.epoch+1, learning_rate))
         log("Checkpoint Path: {}".format(self.checkpoint_path))
+
+
+
         self.set_trainable(layers)
 
         # Optimizer object
@@ -2041,7 +2054,7 @@ class MaskRCNN(nn.Module):
             
             # Backpropagation
             loss.backward()
-            torch.nn.utils.clip_grad_norm(self.parameters(), 5.0)
+            torch.nn.utils.clip_grad_norm_(self.parameters(), 5.0)
             if (batch_count % self.config.BATCH_SIZE) == 0:
                 optimizer.step()
                 optimizer.zero_grad()
@@ -2092,47 +2105,59 @@ class MaskRCNN(nn.Module):
             image_metas = image_metas.numpy()
 
             # Wrap in variables
-            images = Variable(images, volatile=True)
-            rpn_match = Variable(rpn_match, volatile=True)
-            rpn_bbox = Variable(rpn_bbox, volatile=True)
-            gt_class_ids = Variable(gt_class_ids, volatile=True)
-            gt_boxes = Variable(gt_boxes, volatile=True)
-            gt_masks = Variable(gt_masks, volatile=True)
+            # images = Variable(images, volatile=True)
+            # rpn_match = Variable(rpn_match, volatile=True)
+            # rpn_bbox = Variable(rpn_bbox, volatile=True)
+            # gt_class_ids = Variable(gt_class_ids, volatile=True)
+            # gt_boxes = Variable(gt_boxes, volatile=True)
+            # gt_masks = Variable(gt_masks, volatile=True)
 
-            # To GPU
-            if self.config.GPU_COUNT:
-                images = images.cuda()
-                rpn_match = rpn_match.cuda()
-                rpn_bbox = rpn_bbox.cuda()
-                gt_class_ids = gt_class_ids.cuda()
-                gt_boxes = gt_boxes.cuda()
-                gt_masks = gt_masks.cuda()
+            with torch.no_grad():
 
-            # Run object detection
-            rpn_class_logits, rpn_pred_bbox, target_class_ids, mrcnn_class_logits, target_deltas, mrcnn_bbox, target_mask, mrcnn_mask = \
-                self.predict([images, image_metas, gt_class_ids, gt_boxes, gt_masks], mode='training')
+                # To GPU
+                if self.config.GPU_COUNT:
+                    images = images.cuda()
+                    rpn_match = rpn_match.cuda()
+                    rpn_bbox = rpn_bbox.cuda()
+                    gt_class_ids = gt_class_ids.cuda()
+                    gt_boxes = gt_boxes.cuda()
+                    gt_masks = gt_masks.cuda()
 
-            if not target_class_ids.size():
-                continue
+                # Run object detection
+                rpn_class_logits, rpn_pred_bbox, target_class_ids, mrcnn_class_logits, target_deltas, mrcnn_bbox, target_mask, mrcnn_mask = \
+                    self.predict([images, image_metas, gt_class_ids, gt_boxes, gt_masks], mode='training')
 
-            # Compute losses
-            rpn_class_loss, rpn_bbox_loss, mrcnn_class_loss, mrcnn_bbox_loss, mrcnn_mask_loss = compute_losses(rpn_match, rpn_bbox, rpn_class_logits, rpn_pred_bbox, target_class_ids, mrcnn_class_logits, target_deltas, mrcnn_bbox, target_mask, mrcnn_mask)
-            loss = rpn_class_loss + rpn_bbox_loss + mrcnn_class_loss + mrcnn_bbox_loss + mrcnn_mask_loss
+                if not target_class_ids.size():
+                    continue
+
+                # Compute losses
+                rpn_class_loss, rpn_bbox_loss, mrcnn_class_loss, mrcnn_bbox_loss, mrcnn_mask_loss = compute_losses(rpn_match, rpn_bbox, rpn_class_logits, rpn_pred_bbox, target_class_ids, mrcnn_class_logits, target_deltas, mrcnn_bbox, target_mask, mrcnn_mask)
+                loss = rpn_class_loss + rpn_bbox_loss + mrcnn_class_loss + mrcnn_bbox_loss + mrcnn_mask_loss
 
             # Progress
             printProgressBar(step + 1, steps, prefix="\t{}/{}".format(step + 1, steps),
                              suffix="Complete - loss: {:.5f} - rpn_class_loss: {:.5f} - rpn_bbox_loss: {:.5f} - mrcnn_class_loss: {:.5f} - mrcnn_bbox_loss: {:.5f} - mrcnn_mask_loss: {:.5f}".format(
-                                 loss.data.cpu()[0], rpn_class_loss.data.cpu()[0], rpn_bbox_loss.data.cpu()[0],
-                                 mrcnn_class_loss.data.cpu()[0], mrcnn_bbox_loss.data.cpu()[0],
-                                 mrcnn_mask_loss.data.cpu()[0]), length=10)
+                                #  loss.data.cpu()[0], rpn_class_loss.data.cpu()[0], rpn_bbox_loss.data.cpu()[0],
+                                 loss.item(),rpn_class_loss.item(),rpn_bbox_loss.item(),
+                                 mrcnn_class_loss.item(), mrcnn_bbox_loss.item(),
+                                 mrcnn_mask_loss.item()), length=10)
+                                #  mrcnn_class_loss.data.cpu()[0], mrcnn_bbox_loss.data.cpu()[0],
+                                #  mrcnn_mask_loss.data.cpu()[0]), length=10)
 
             # Statistics
-            loss_sum += loss.data.cpu()[0]/steps
-            loss_rpn_class_sum += rpn_class_loss.data.cpu()[0]/steps
-            loss_rpn_bbox_sum += rpn_bbox_loss.data.cpu()[0]/steps
-            loss_mrcnn_class_sum += mrcnn_class_loss.data.cpu()[0]/steps
-            loss_mrcnn_bbox_sum += mrcnn_bbox_loss.data.cpu()[0]/steps
-            loss_mrcnn_mask_sum += mrcnn_mask_loss.data.cpu()[0]/steps
+            # loss_sum += loss.data.cpu()[0]/steps
+            # loss_rpn_class_sum += rpn_class_loss.data.cpu()[0]/steps
+            # loss_rpn_bbox_sum += rpn_bbox_loss.data.cpu()[0]/steps
+            # loss_mrcnn_class_sum += mrcnn_class_loss.data.cpu()[0]/steps
+            # loss_mrcnn_bbox_sum += mrcnn_bbox_loss.data.cpu()[0]/steps
+            # loss_mrcnn_mask_sum += mrcnn_mask_loss.data.cpu()[0]/steps
+
+            loss_sum += loss.item()/steps
+            loss_rpn_class_sum += rpn_class_loss.item()/steps
+            loss_rpn_bbox_sum += rpn_bbox_loss.item()/steps
+            loss_mrcnn_class_sum += mrcnn_class_loss.item()/steps
+            loss_mrcnn_bbox_sum += mrcnn_bbox_loss.item()/steps
+            loss_mrcnn_mask_sum += mrcnn_mask_loss.item()/steps
 
             # Break after 'steps' steps
             if step==steps-1:

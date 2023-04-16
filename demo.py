@@ -25,7 +25,9 @@ MODEL_DIR = os.path.join(ROOT_DIR, "logs")
 # Download this file and place in the models directory
 # download link- https://drive.google.com/drive/folders/1LXUgC2IZUYNEoXr05tdqyKFZY0pZyPDc
 # project (See README file for details)
+
 COCO_MODEL_PATH = os.path.join(ROOT_DIR, "models/mask_rcnn_coco.pth")
+MODEL_WEIGHTS_PATH = os.path.join(ROOT_DIR, "models/nocs_train20230416T0013/mask_rcnn_nocs_train_0010.pth")
 
 # Directory of images to run detection on
 IMAGE_DIR = os.path.join(ROOT_DIR, "images")

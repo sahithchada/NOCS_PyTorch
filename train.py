@@ -64,8 +64,8 @@ class CocoConfig(Config):
 
 class Nocs_train_config(Config):
     # config file for nocs training, derives from base config  
-    NAME="NOCS train"
-    GPU_COUNT = 0
+    NAME="NOCS_train"
+    GPU_COUNT = 1
     # We use one GPU with 8GB memory, which can fit one image.
     # Adjust down if you use a smaller GPU.
     IMAGES_PER_GPU = 16
@@ -722,6 +722,16 @@ if __name__ == '__main__':
     model.load_state_dict(filtered_state_dict, strict=False)
 
 
+    if config.GPU_COUNT > 0:
+        device = torch.device('cuda')
+    else:
+        device = torch.device('cpu')
+
+    # device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    model.to(device)
+
+    # print(next(model.parameters()).is_cuda)
+
     #load data
     # dataset_train = TrainData(camera_train_dir,transform = None)
     # dataset_val=TrainData(camera_val_dir,transform = None)
@@ -732,6 +742,13 @@ if __name__ == '__main__':
     trainset.load_camera_scenes(camera_dir)
     trainset.prepare(class_map)
 
+    # # Looping though data loader
+    # train_set = modellib.Dataset(trainset, config, augment=True)
+
+    # for i,j in enumerate(train_set):
+        
+    #     pass
+
     valset = SyntheticData(synset_names,'val')
     valset.load_camera_scenes(camera_dir)
     valset.prepare(class_map)
@@ -741,24 +758,24 @@ if __name__ == '__main__':
     #print("Training network heads")
     model.train_model(trainset, valset,
                 learning_rate=config.LEARNING_RATE,
-                epochs=100,
+                epochs=10,
                 layers='heads')
 
-    # Training - Stage 2
-    # Finetune layers from ResNet stage 4 and up
-    print("Training Resnet layer 4+")
-    model.train_model(dataset_train, dataset_val,
-                learning_rate=config.LEARNING_RATE/10,
-                epochs=130,
-                layers='4+')
+    # # Training - Stage 2
+    # # Finetune layers from ResNet stage 4 and up
+    # print("Training Resnet layer 4+")
+    # model.train_model(dataset_train, dataset_val,
+    #             learning_rate=config.LEARNING_RATE/10,
+    #             epochs=130,
+    #             layers='4+')
 
-    # Training - Stage 3
-    # Finetune layers from ResNet stage 3 and up
-    print("Training Resnet layer 3+")
-    model.train_model(dataset_train, dataset_val,
-                learning_rate=config.LEARNING_RATE/100,
-                epochs=400,
-                layers='all')
+    # # Training - Stage 3
+    # # Finetune layers from ResNet stage 3 and up
+    # print("Training Resnet layer 3+")
+    # model.train_model(dataset_train, dataset_val,
+    #             learning_rate=config.LEARNING_RATE/100,
+    #             epochs=400,
+    #             layers='all')
     
 
 
