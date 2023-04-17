@@ -148,7 +148,7 @@ class Config(object):
     # train the RPN.
     USE_RPN_ROIS = True
 
-    NUM_BINS=16
+    NUM_BINS=32
 
     OBJ_MODEL_DIR = os.path.join('data','obj_models')
 

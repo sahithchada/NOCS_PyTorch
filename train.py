@@ -766,7 +766,7 @@ if __name__ == '__main__':
     print("Training Resnet layer 4+")
     model.train_model(trainset, valset,
                 learning_rate=config.LEARNING_RATE/10,
-                epochs=2,
+                epochs=5,
                 layers='4+')
 
     # Training - Stage 3
@@ -774,7 +774,7 @@ if __name__ == '__main__':
     print("Training Resnet layer 3+")
     model.train_model(trainset, valset,
                 learning_rate=config.LEARNING_RATE/100,
-                epochs=2,
+                epochs=10,
                 layers='all')
     
 

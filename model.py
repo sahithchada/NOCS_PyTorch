@@ -1219,7 +1219,7 @@ def compute_mrcnn_mask_loss(target_masks, target_class_ids, pred_masks):
 
     return loss
 
-def compute_losses(rpn_match, rpn_bbox, rpn_class_logits, rpn_pred_bbox, target_class_ids, mrcnn_class_logits, target_deltas, mrcnn_bbox, target_mask, mrcnn_mask):
+def compute_losses(rpn_match, rpn_bbox, rpn_class_logits, rpn_pred_bbox, target_class_ids, mrcnn_class_logits, target_deltas, mrcnn_bbox, target_mask, mrcnn_mask, pred_coords):
 
     rpn_class_loss = compute_rpn_class_loss(rpn_match, rpn_class_logits)
     rpn_bbox_loss = compute_rpn_bbox_loss(rpn_bbox, rpn_match, rpn_pred_bbox)
@@ -2037,7 +2037,26 @@ class MaskRCNN(nn.Module):
                 # Create masks for detections
                 mrcnn_mask = self.mask(mrcnn_feature_maps, rois)
 
-            return [rpn_class_logits, rpn_bbox, target_class_ids, mrcnn_class_logits, target_deltas, mrcnn_bbox, target_mask, mrcnn_mask]
+            #using bins, unshared weights, not using deltas
+            #nocs inference
+            #self, depth, pool_size, image_shape, num_classes
+            #self,depth, pool_size,image_shape, num_classes, num_bins, net_name
+            mrcnn_coord_x_bin, mrcnn_coord_x_feature = self.nocs_head_x(mrcnn_feature_maps, gt_boxes)
+            mrcnn_coord_y_bin, mrcnn_coord_y_feature = self.nocs_head_y(mrcnn_feature_maps, gt_boxes )
+            mrcnn_coord_z_bin, mrcnn_coord_z_feature = self.nocs_head_z(mrcnn_feature_maps, gt_boxes)
+
+            coord_bin_values_module = CoordBinValues(self.config.NUM_BINS)
+            mrcnn_coord_x_bin_value = coord_bin_values_module(mrcnn_coord_x_bin)
+            mrcnn_coord_y_bin_value = coord_bin_values_module(mrcnn_coord_y_bin)
+            mrcnn_coord_z_bin_value = coord_bin_values_module(mrcnn_coord_z_bin)
+
+            mrcnn_coord_x_bin_value = mrcnn_coord_x_bin_value.unsqueeze(0)
+            mrcnn_coord_y_bin_value = mrcnn_coord_y_bin_value.unsqueeze(0)
+            mrcnn_coord_z_bin_value = mrcnn_coord_z_bin_value.unsqueeze(0)
+
+            pred_coords = [mrcnn_coord_x_bin_value,mrcnn_coord_y_bin_value,mrcnn_coord_z_bin_value]
+
+            return [rpn_class_logits, rpn_bbox, target_class_ids, mrcnn_class_logits, target_deltas, mrcnn_bbox, target_mask, mrcnn_mask, pred_coords]
 
     def train_model(self, train_dataset, val_dataset, learning_rate, epochs, layers):
         """Train the model.
@@ -2082,7 +2101,6 @@ class MaskRCNN(nn.Module):
         log("Checkpoint Path: {}".format(self.checkpoint_path))
 
 
-
         self.set_trainable(layers)
 
         # Optimizer object
@@ -2124,6 +2142,7 @@ class MaskRCNN(nn.Module):
         loss_mrcnn_class_sum = 0
         loss_mrcnn_bbox_sum = 0
         loss_mrcnn_mask_sum = 0
+        loss_coord_sum = 0
         step = 0
 
         optimizer.zero_grad()
@@ -2162,14 +2181,13 @@ class MaskRCNN(nn.Module):
                 gt_masks = gt_masks.cuda()
 
             # Run object detection
-            rpn_class_logits, rpn_pred_bbox, target_class_ids, mrcnn_class_logits, target_deltas, mrcnn_bbox, target_mask, mrcnn_mask = \
+            rpn_class_logits, rpn_pred_bbox, target_class_ids, mrcnn_class_logits, target_deltas, mrcnn_bbox, target_mask, mrcnn_mask, pred_coords = \
                 self.predict([images, image_metas, gt_class_ids, gt_boxes, gt_masks], mode='training')
 
             # Compute losses
-            rpn_class_loss, rpn_bbox_loss, mrcnn_class_loss, mrcnn_bbox_loss, mrcnn_mask_loss = compute_losses(rpn_match, rpn_bbox, rpn_class_logits, rpn_pred_bbox, target_class_ids, mrcnn_class_logits, target_deltas, mrcnn_bbox, target_mask, mrcnn_mask)
+            rpn_class_loss, rpn_bbox_loss, mrcnn_class_loss, mrcnn_bbox_loss, mrcnn_mask_loss = compute_losses(rpn_match, rpn_bbox, rpn_class_logits, rpn_pred_bbox, target_class_ids, mrcnn_class_logits, target_deltas, mrcnn_bbox, target_mask, mrcnn_mask, pred_coords)
             loss = rpn_class_loss + rpn_bbox_loss + mrcnn_class_loss + mrcnn_bbox_loss + mrcnn_mask_loss
 
-            
             # Backpropagation
             loss.backward()
             torch.nn.utils.clip_grad_norm_(self.parameters(), 5.0)
@@ -2209,6 +2227,7 @@ class MaskRCNN(nn.Module):
         loss_mrcnn_class_sum = 0
         loss_mrcnn_bbox_sum = 0
         loss_mrcnn_mask_sum = 0
+        loss_coord_sum = 0
 
         for inputs in datagenerator:
             images = inputs[0]
@@ -2218,6 +2237,8 @@ class MaskRCNN(nn.Module):
             gt_class_ids = inputs[4]
             gt_boxes = inputs[5]
             gt_masks = inputs[6]
+            gt_coords = inputs[7]
+            gt_domain_label = inputs[8]
 
             # image_metas as numpy array
             image_metas = image_metas.numpy()
@@ -2242,14 +2263,14 @@ class MaskRCNN(nn.Module):
                     gt_masks = gt_masks.cuda()
 
                 # Run object detection
-                rpn_class_logits, rpn_pred_bbox, target_class_ids, mrcnn_class_logits, target_deltas, mrcnn_bbox, target_mask, mrcnn_mask = \
+                rpn_class_logits, rpn_pred_bbox, target_class_ids, mrcnn_class_logits, target_deltas, mrcnn_bbox, target_mask, mrcnn_mask, pred_coords = \
                     self.predict([images, image_metas, gt_class_ids, gt_boxes, gt_masks], mode='training')
 
                 if not target_class_ids.size():
                     continue
 
                 # Compute losses
-                rpn_class_loss, rpn_bbox_loss, mrcnn_class_loss, mrcnn_bbox_loss, mrcnn_mask_loss = compute_losses(rpn_match, rpn_bbox, rpn_class_logits, rpn_pred_bbox, target_class_ids, mrcnn_class_logits, target_deltas, mrcnn_bbox, target_mask, mrcnn_mask)
+                rpn_class_loss, rpn_bbox_loss, mrcnn_class_loss, mrcnn_bbox_loss, mrcnn_mask_loss = compute_losses(rpn_match, rpn_bbox, rpn_class_logits, rpn_pred_bbox, target_class_ids, mrcnn_class_logits, target_deltas, mrcnn_bbox, target_mask, mrcnn_mask, pred_coords)
                 loss = rpn_class_loss + rpn_bbox_loss + mrcnn_class_loss + mrcnn_bbox_loss + mrcnn_mask_loss
 
             # Progress
