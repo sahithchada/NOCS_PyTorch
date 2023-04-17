@@ -715,7 +715,8 @@ if __name__ == '__main__':
     # Load the state dictionary of the pre-trained model
     pretrained_state_dict = torch.load(COCO_MODEL_PATH)
     # List of layers to exclude, changed 
-    exclude_layers = ["mrcnn_class_logits", "mrcnn_bbox_fc", "mrcnn_bbox", "mrcnn_mask","mask","classifier"]
+    # exclude_layers = ["mrcnn_class_logits", "mrcnn_bbox_fc", "mrcnn_bbox", "mrcnn_mask","mask","classifier"]
+    exclude_layers = ["mrcnn_class_logits", "mrcnn_bbox_fc", "mrcnn_bbox", "mrcnn_mask"]
     # Filter out the layers to exclude from the state dictionary
     filtered_state_dict = {k: v for k, v in pretrained_state_dict.items() if not any(layer in k for layer in exclude_layers)}
     # Load the modified state dictionary into your model
