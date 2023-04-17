@@ -13,6 +13,7 @@ import os
 import random
 import re
 
+
 import numpy as np
 import torch
 import torch.nn as nn
@@ -1809,7 +1810,7 @@ class MaskRCNN(nn.Module):
         checkpoint = os.path.join(dir_name, checkpoints[-1])
         return dir_name, checkpoint
 
-    def load_weights(self, filepath):
+    def load_weights_old(self, filepath):
         """Modified version of the correspoding Keras function with
         the addition of multi-GPU support and the ability to exclude
         some layers from loading.
@@ -1825,6 +1826,7 @@ class MaskRCNN(nn.Module):
         self.set_log_dir(filepath)
         if not os.path.exists(self.log_dir):
             os.makedirs(self.log_dir)
+
 
     def detect(self, images):
         """Runs the detection pipeline.

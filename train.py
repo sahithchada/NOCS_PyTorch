@@ -66,15 +66,44 @@ class Nocs_train_config(Config):
     # config file for nocs training, derives from base config  
     NAME="NOCS_train"
     GPU_COUNT = 1
-    # We use one GPU with 8GB memory, which can fit one image.
-    # Adjust down if you use a smaller GPU.
-    IMAGES_PER_GPU = 16
-
-    # Uncomment to train on 8 GPUs (default is 1)
-    # GPU_COUNT = 8
+    IMAGES_PER_GPU = 1
 
     # Number of classes (including background)
-    NUM_CLASSES = 1 + 6 # Background plus 6 classes
+    NUM_CLASSES = 1 + 6  # background + 6 object categories
+    MEAN_PIXEL = np.array([[ 120.66209412, 114.70348358, 105.81269836]])
+
+    IMAGE_MIN_DIM = 480
+    IMAGE_MAX_DIM = 640
+
+    RPN_ANCHOR_SCALES = (16, 32, 48, 64, 128)  # anchor side in pixels
+
+    # Reduce training ROIs per image because the images are small and have
+    # few objects. Aim to allow ROI sampling to pick 33% positive ROIs.
+    TRAIN_ROIS_PER_IMAGE = 64
+
+    # Use a small epoch since the data is simple
+    STEPS_PER_EPOCH = 1000
+
+    # use small validation steps since the epoch is small
+    VALIDATION_STEPS = 50
+
+    WEIGHT_DECAY = 0.0001
+    LEARNING_RATE = 0.001
+    LEARNING_MOMENTUM = 0.9
+
+    COORD_LOSS_SCALE = 1
+    
+    COORD_USE_BINS = True
+    if COORD_USE_BINS:
+         COORD_NUM_BINS = 32
+    else:
+        COORD_REGRESS_LOSS   = 'Soft_L1'
+   
+    COORD_SHARE_WEIGHTS = False
+    COORD_USE_DELTA = False
+
+    COORD_POOL_SIZE = 14
+    COORD_SHAPE = [28, 28]
 
 ############################################################
 #  Dataset
@@ -653,6 +682,31 @@ class SyntheticData(utils.Dataset):
 
         return image, masks, coords, class_ids, scales, domain_label
 
+
+def load_weights(self, model, filepath, exclude=None):
+    """
+    Loads weights from a PyTorch checkpoint to the PyTorch model.
+    
+    Args:
+    - filepath (str): The path to the PyTorch checkpoint file (.pth).
+    - by_name (bool): Whether to load weights by name or by topology.
+    - exclude (list): A list of layer names to exclude from loading.
+    """
+
+    # Exclude some layers
+    if exclude:
+        model_dict = model.state_dict()
+        for layer_name in exclude:
+            del model_dict[layer_name]
+        model.load_state_dict(model_dict)
+
+    else:
+        model.load_state_dict(torch.load(filepath))
+
+
+    # Update the log directory
+    self.set_log_dir(filepath)
+
 #main training   
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
@@ -685,7 +739,7 @@ if __name__ == '__main__':
                   'sink', 'refrigerator', 'book', 'clock', 'vase', 'scissors',
                   'teddy bear', 'hair drier', 'toothbrush']
 
-    
+    # 0, 40, 46, rand, rand, 64, 42
     synset_names = ['BG', #0
                     'bottle', #1
                     'bowl', #2
@@ -715,13 +769,64 @@ if __name__ == '__main__':
     # Load the state dictionary of the pre-trained model
     pretrained_state_dict = torch.load(COCO_MODEL_PATH)
     # List of layers to exclude, changed 
-    # exclude_layers = ["mrcnn_class_logits", "mrcnn_bbox_fc", "mrcnn_bbox", "mrcnn_mask","mask","classifier"]
-    exclude_layers = ["mrcnn_class_logits", "mrcnn_bbox_fc", "mrcnn_bbox", "mrcnn_mask"]
+    exclude_layers = ["mrcnn_class_logits", "mrcnn_bbox_fc", "mrcnn_bbox", "mrcnn_mask","mask","classifier"]
+    # exclude_layers = ["mrcnn_class_logits", "mrcnn_bbox_fc", "mrcnn_bbox", "mrcnn_mask"]
     # Filter out the layers to exclude from the state dictionary
     filtered_state_dict = {k: v for k, v in pretrained_state_dict.items() if not any(layer in k for layer in exclude_layers)}
+
+    mismatches = ["classifier.linear_class.weight","classifier.linear_class.bias","classifier.linear_bbox.weight","classifier.linear_bbox.bias","mask.conv5.weight","mask.conv5.bias"]
+
+    # for i in range(len(mismatches)):
+
+    #     weights = filtered_state_dict[mismatches[i]]
+
+    #     if weights.shape[0] == 81 and weights.dim() > 1:
+    #         w1 = weights[[0,40,46]]
+    #         w2 = weights[[64,42]]
+    #         w3 = torch.rand_like(w2)
+
+    #         final_weights = torch.vstack((w1,w2,w3))
+    #         pass
+
+    #     elif weights.shape[0] == 324 and len(weights.shape) > 1:
+    #         weights = torch.reshape(weights, (81,4,1024))
+    #         w1 = weights[[0,40,46]]
+    #         w2 = weights[[64,42]]
+    #         w3 = torch.rand_like(w2)
+
+    #         final_weights = torch.vstack((w1.flatten(end_dim=-2),w2.flatten(end_dim=-2),w3.flatten(end_dim=-2)))
+
+    #     elif weights.shape[0] == 324:
+    #         weights = torch.reshape(weights, (81,4))
+    #         w1 = weights[[0,40,46]]
+    #         w2 = weights[[64,42]]
+    #         w3 = torch.rand_like(w2)
+
+    #         final_weights = torch.cat((w1.flatten(),w2.flatten(),w3.flatten()))
+    #     else:
+    #         w1 = weights[[0,40,46]]
+    #         w2 = weights[[64,42]]
+    #         w3 = torch.rand_like(w2)
+
+    #         final_weights = torch.cat((w1,w2,w3))
+
+    #     filtered_state_dict[mismatches[i]] = final_weights
+
+    # # filtered_state_dict['classifier.linear_class.weight'] = torch.filtered_state_dict['classifier.linear_class.weight'][[0,],:]
+
+
     # Load the modified state dictionary into your model
     model.load_state_dict(filtered_state_dict, strict=False)
 
+
+    # model_dict = model.state_dict()
+    # checkpoint_dict = {k: v for k, v in pretrained_state_dict.items() if k not in exclude_layers}
+    # model_dict.update(checkpoint_dict)
+
+    # model.load_state_dict(model_dict)
+
+    # # Update the log directory
+    # model.set_log_dir(COCO_MODEL_PATH)
 
     if config.GPU_COUNT > 0:
         device = torch.device('cuda')
@@ -759,7 +864,7 @@ if __name__ == '__main__':
     #print("Training network heads")
     model.train_model(trainset, valset,
                 learning_rate=config.LEARNING_RATE,
-                epochs=2,
+                epochs=10,
                 layers='heads')
 
     # Training - Stage 2
