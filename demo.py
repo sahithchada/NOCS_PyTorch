@@ -57,7 +57,7 @@ for key in model_state_dict.keys():
     else:
         # If the layer does not exist in pretrained weights, initialize with random weights
         shape = model_state_dict[key].shape
-        model_state_dict[key] = torch.randn(shape).normal_(mean=0, std=0.01)
+        model_state_dict[key] = torch.randn(shape).normal_(mean=0, std=3.0)
 
 # Load the updated state dictionary into the model
 model.load_state_dict(model_state_dict)
@@ -90,18 +90,38 @@ file_names = next(os.walk(IMAGE_DIR))[2]
 image = skimage.io.imread(os.path.join(IMAGE_DIR, random.choice(file_names)))
 #image = skimage.io.imread(os.path.join(IMAGE_DIR, file_names[0]))
 '''
-#file_names = next(os.walk(IMAGE_DIR))[2]
-file_names = [f for f in os.listdir(IMAGE_DIR) if f.endswith(( '.jpg'))]
-#image = skimage.io.imread(os.path.join(IMAGE_DIR, random.choice(file_names)))
-image = skimage.io.imread(os.path.join(IMAGE_DIR, file_names[0]))
 
+
+#file_names = next(os.walk(IMAGE_DIR))[2]
+
+
+# Here we decide to use coco imgs or pngs from NOCS data
+file_names = [f for f in os.listdir(IMAGE_DIR) if f.endswith(( '.png'))]
+# file_names = [f for f in os.listdir(IMAGE_DIR) if f.endswith(( '.jpg'))]
+
+
+# Decide between random choice or run on certain image
+file_name = random.choice(file_names)
+# file_name = file_names[0]
+
+print(file_name)
+
+image = skimage.io.imread(os.path.join(IMAGE_DIR, file_name))
 
 # Run detection
 results = model.detect([image])
 
 # Visualize results
 r = results[0]
-visualize.display_instances(image, r['rois'], r['masks'], r['class_ids'],
-                            class_names, r['scores'])
-plt.savefig("output_images/output.png")
-#plt.show()
+
+rois, masks, class_ids, scores, coords = r['rois'], r['masks'], r['class_ids'], r['scores'],r['coords']
+
+print(np.sum(coords[0]))
+
+visualize.plot_nocs(coords,file_name)
+
+visualize.display_instances(image, rois, masks, class_ids, class_names,file_name,scores)
+
+
+# plt.savefig("output_images/output.png")
+# plt.show()
