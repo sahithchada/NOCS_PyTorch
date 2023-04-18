@@ -586,6 +586,7 @@ def detection_target_layer(proposals, gt_class_ids, gt_boxes, gt_masks,gt_coords
     target_mask: [batch, TRAIN_ROIS_PER_IMAGE, height, width)
                  Masks cropped to bbox boundaries and resized to neural
                  network output size.
+    terget_coord: [[batch, TRAIN_ROIS_PER_IMAGE, height, width,3)]
     """
 
     # Currently only supports batchsize 1
@@ -685,7 +686,7 @@ def detection_target_layer(proposals, gt_class_ids, gt_boxes, gt_masks,gt_coords
         #############COMPUTE COORDS##################
 
 
-
+        '''
         coord_x = F.interpolate(torch.tensor(roi_coord_x, dtype=torch.float32),
                                 size=config.COORD_SHAPE,
                                 mode='bilinear', align_corners=True)
@@ -695,6 +696,7 @@ def detection_target_layer(proposals, gt_class_ids, gt_boxes, gt_masks,gt_coords
         coord_z = F.interpolate(torch.tensor(roi_coord_z, dtype=torch.float32),
                                 size=config.COORD_SHAPE,
                                 mode='bilinear', align_corners=True)
+        '''
         ##################################################
 
 
@@ -724,6 +726,25 @@ def detection_target_layer(proposals, gt_class_ids, gt_boxes, gt_masks,gt_coords
         # Threshold mask pixels at 0.5 to have GT masks be 0 or 1 to use with
         # binary cross entropy loss.
         masks = torch.round(masks)
+
+        roi_align_x = RoIAlign((config.COORD_SHAPE[0], config.COORD_SHAPE[1]), spatial_scale=h,sampling_ratio=-1)
+        roi_align_y = RoIAlign((config.COORD_SHAPE[0], config.COORD_SHAPE[1]), spatial_scale=h,sampling_ratio=-1)
+        roi_align_z = RoIAlign((config.COORD_SHAPE[0], config.COORD_SHAPE[1]), spatial_scale=h,sampling_ratio=-1)
+        roi_coord_x_reshaped=torch.permute(roi_coord_x, (3, 0, 1,2))
+        roi_coord_y_reshaped=torch.permute(roi_coord_y, (3, 0, 1,2))
+        roi_coord_z_reshaped=torch.permute(roi_coord_z, (3, 0, 1,2))
+
+        coord_x=roi_align_x(roi_coord_x_reshaped,level_boxes)
+        coord_y=roi_align_y(roi_coord_y_reshaped,level_boxes)
+        coord_z=roi_align_z(roi_coord_z_reshaped,level_boxes)
+        
+        #masks = Variable(CropAndResizeFunction(config.MASK_SHAPE[0], config.MASK_SHAPE[1], 0)(roi_masks.unsqueeze(1), boxes, box_ids).data, requires_grad=False)
+        #masks = masks.squeeze(1)
+        coord_x=torch.reshape(coord_x,(-1,coord_x.shape[2],coord_x.shape[3]))
+        coord_y=torch.reshape(coord_y,(-1,coord_y.shape[2],coord_y.shape[3]))
+        coord_z=torch.reshape(coord_z,(-1,coord_z.shape[2],coord_z.shape[3]))
+
+
     else:
         positive_count = 0
 
@@ -761,6 +782,9 @@ def detection_target_layer(proposals, gt_class_ids, gt_boxes, gt_masks,gt_coords
         if config.GPU_COUNT:
             zeros = zeros.cuda()
         masks = torch.cat([masks, zeros], dim=0)
+        coord_x = torch.cat([coord_x, zeros], dim=0)
+        coord_y = torch.cat([coord_y, zeros], dim=0)
+        coord_z = torch.cat([coord_z, zeros], dim=0)
     elif positive_count > 0:
         rois = positive_rois
     elif negative_count > 0:
@@ -777,23 +801,34 @@ def detection_target_layer(proposals, gt_class_ids, gt_boxes, gt_masks,gt_coords
         if config.GPU_COUNT:
             zeros = zeros.cuda()
         masks = zeros
+        coord_x=zeros
+        coord_y=zeros
+        coord_z=zeros
     else:
         rois = Variable(torch.FloatTensor(), requires_grad=False)
         roi_gt_class_ids = Variable(torch.IntTensor(), requires_grad=False)
         deltas = Variable(torch.FloatTensor(), requires_grad=False)
         masks = Variable(torch.FloatTensor(), requires_grad=False)
+        coord_x= Variable(torch.FloatTensor(), requires_grad=False)
+        coord_y= Variable(torch.FloatTensor(), requires_grad=False)
+        coord_z= Variable(torch.FloatTensor(), requires_grad=False)
         if config.GPU_COUNT:
             rois = rois.cuda()
             roi_gt_class_ids = roi_gt_class_ids.cuda()
             deltas = deltas.cuda()
             masks = masks.cuda()
+            coord_x=coord_x.cuda()
+            coord_x=coord_y.cuda()
+            coord_x=coord_z.cuda()
+
     ##########COMPUTE FINAL  X,Y,Z,coords#############################
+    '''
     N = negative_rois.size(0)
     P = max(config.TRAIN_ROIS_PER_IMAGE - rois.size(0), 0)
     coord_x = torch.squeeze(coord_x, dim=3)
     coord_y = torch.squeeze(coord_y, dim=3)
     coord_z = torch.squeeze(coord_z, dim=3)
-
+    
     coord_x = torch.nn.functional.pad(coord_x, (0, 0, 0, N + P, 0, 0), mode='constant', value=0)
     coord_y = torch.nn.functional.pad(coord_y, (0, 0, 0, N + P, 0, 0), mode='constant', value=0)
     coord_z = torch.nn.functional.pad(coord_z, (0, 0, 0, N + P, 0, 0), mode='constant', value=0)
@@ -801,6 +836,7 @@ def detection_target_layer(proposals, gt_class_ids, gt_boxes, gt_masks,gt_coords
     coord_x = coord_x.float()
     coord_y = coord_y.float()
     coord_z = coord_z.float()
+    '''
     ##############################################################################
 
     return rois, roi_gt_class_ids, deltas, masks,coord_x, coord_y, coord_z
@@ -2129,6 +2165,7 @@ class MaskRCNN(nn.Module):
             mrcnn_coord_z_bin, mrcnn_coord_z_feature = self.nocs_head_z(mrcnn_feature_maps, detection_boxes)
 
             coord_bin_values_module = CoordBinValues(self.config.NUM_BINS)
+            print(self.config.NUM_BINS)
             mrcnn_coord_x_bin_value = coord_bin_values_module(mrcnn_coord_x_bin)
             mrcnn_coord_y_bin_value = coord_bin_values_module(mrcnn_coord_y_bin)
             mrcnn_coord_z_bin_value = coord_bin_values_module(mrcnn_coord_z_bin)
@@ -2160,7 +2197,7 @@ class MaskRCNN(nn.Module):
             
             rois, target_class_ids, target_deltas, target_mask,target_coord_x, target_coord_y, target_coord_z = \
                 detection_target_layer(rpn_rois, gt_class_ids, gt_boxes, gt_masks,gt_coords, self.config)
-            target_coords = torch.stack([target_coord_x, target_coord_y, target_coord_z], dim=4)
+            target_coords = torch.stack([target_coord_x, target_coord_y, target_coord_z])
             print(target_coords.shape)
             if not rois.size():
                 mrcnn_class_logits = Variable(torch.FloatTensor())
@@ -2328,14 +2365,14 @@ class MaskRCNN(nn.Module):
                 self.predict([images, image_metas, gt_class_ids, gt_boxes, gt_masks,gt_coords,gt_domain_label], mode='training')
             
             print(gt_domain_label.shape,target_class_ids.shape)
-            target_domain_labels = torch.tile(gt_domain_label, (1, target_class_ids.shape[1]))
+            target_domain_labels = torch.tile(gt_domain_label, (1, target_class_ids.shape[0]))
 
             ########### Calculating and calling symmetric los here ############################
             mrcnn_coord_x_bin_value=pred_coords[0]
             mrcnn_coord_y_bin_value=pred_coords[1]
             mrcnn_coord_z_bin_value=pred_coords[2]
 
-            mrcnn_coords_bin = torch.cat([mrcnn_coord_x_bin_value, mrcnn_coord_y_bin_value, mrcnn_coord_z_bin_value], dim=-1)
+            mrcnn_coords_bin = torch.stack([mrcnn_coord_x_bin_value, mrcnn_coord_y_bin_value, mrcnn_coord_z_bin_value], dim=-1)
             coord_bin_loss = mrcnn_coord_bins_symmetry_loss(target_mask, target_coords, target_class_ids, target_domain_labels, mrcnn_coords_bin)
             coord_x_bin_loss = coord_bin_loss[0].reshape(1, 1)
             coord_y_bin_loss = coord_bin_loss[1].reshape(1, 1)
