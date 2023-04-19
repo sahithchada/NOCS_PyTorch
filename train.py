@@ -41,7 +41,7 @@ COCO_MODEL_PATH = os.path.join(ROOT_DIR, "models/mask_rcnn_coco.pth")
 # Directory to save logs and model checkpoints, if not provided
 # through the command line argument --logs
 DEFAULT_LOGS_DIR = os.path.join(ROOT_DIR, "logs")
-DEFAULT_DATASET_YEAR = "2014"
+DEFAULT_DATASET_YEAR = 2014
 IMAGE_DIR = os.path.join(ROOT_DIR, "images")
 
 ############################################################
@@ -369,7 +369,7 @@ class SyntheticData(utils.Dataset):
         
         num_total_folders = len(folder_list)
 
-        image_ids = range(10*num_total_folders)
+        # image_ids = range(10*num_total_folders)
         color_mean = np.zeros((0, 3), dtype=np.float32)
         # Add images
         for folder_id in folder_list:
@@ -765,12 +765,14 @@ if __name__ == '__main__':
     mismatches = ["classifier.linear_class.weight","classifier.linear_class.bias","classifier.linear_bbox.weight","classifier.linear_bbox.bias","mask.conv5.weight","mask.conv5.bias"]
 
 
-    # classifier.linear_class.weight: og: ([81, 1024]) changed: torch.Size([7, 1024]).
-	# classifier.linear_class.bias: og: torch.Size([81]) changed: torch.Size([7]).
-	# classifier.linear_bbox.weight: og: torch.Size([324, 1024]) changed: torch.Size([28, 1024]).
-	# classifier.linear_bbox.bias: og: torch.Size([324]) changed: torch.Size([28]).
-	# mask.conv5.weight: og: torch.Size([81, 256, 1, 1]) changed: torch.Size([7, 256, 1, 1]).
-	# mask.conv5.bias: og: torch.Size([81]) changed: torch.Size([7]).
+    """     
+    classifier.linear_class.weight: og: ([81, 1024]) changed: torch.Size([7, 1024]).
+    classifier.linear_class.bias: og: torch.Size([81]) changed: torch.Size([7]).
+    classifier.linear_bbox.weight: og: torch.Size([324, 1024]) changed: torch.Size([28, 1024]).
+    classifier.linear_bbox.bias: og: torch.Size([324]) changed: torch.Size([28]).
+    mask.conv5.weight: og: torch.Size([81, 256, 1, 1]) changed: torch.Size([7, 256, 1, 1]).
+    mask.conv5.bias: og: torch.Size([81]) changed: torch.Size([7]). 
+    """
 
     # for i in range(len(mismatches)):
 

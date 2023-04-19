@@ -2069,9 +2069,6 @@ class MaskRCNN(nn.Module):
         if self.config.GPU_COUNT:
             molded_images = molded_images.cuda()
 
-        # Wrap in variable
-        #molded_images = Variable(molded_images, volatile=True)
-
         # Run object detection
         detections, mrcnn_mask,mrcnn_coord_x,mrcnn_coord_y,mrcnn_coord_z = self.predict([molded_images, image_metas], mode='inference')
 
@@ -2213,7 +2210,6 @@ class MaskRCNN(nn.Module):
             mrcnn_coord_z_bin, mrcnn_coord_z_feature = self.nocs_head_z(mrcnn_feature_maps, detection_boxes)
 
             coord_bin_values_module = CoordBinValues(self.config.NUM_BINS)
-            print(self.config.NUM_BINS)
             mrcnn_coord_x_bin_value = coord_bin_values_module(mrcnn_coord_x_bin)
             mrcnn_coord_y_bin_value = coord_bin_values_module(mrcnn_coord_y_bin)
             mrcnn_coord_z_bin_value = coord_bin_values_module(mrcnn_coord_z_bin)
@@ -2321,7 +2317,7 @@ class MaskRCNN(nn.Module):
         # Data generators
         train_set = Dataset(train_dataset, self.config, augment=True)
         train_generator = torch.utils.data.DataLoader(train_set, batch_size=1, shuffle=False, num_workers=1)
-        val_set = Dataset(val_dataset, self.config, augment=False)
+        val_set = Dataset(val_dataset, self.config, augment=True)
         val_generator = torch.utils.data.DataLoader(val_set, batch_size=1, shuffle=False, num_workers=1)
 
         # Train
@@ -2497,14 +2493,6 @@ class MaskRCNN(nn.Module):
 
             # image_metas as numpy array
             image_metas = image_metas.numpy()
-
-            # Wrap in variables
-            # images = Variable(images, volatile=True)
-            # rpn_match = Variable(rpn_match, volatile=True)
-            # rpn_bbox = Variable(rpn_bbox, volatile=True)
-            # gt_class_ids = Variable(gt_class_ids, volatile=True)
-            # gt_boxes = Variable(gt_boxes, volatile=True)
-            # gt_masks = Variable(gt_masks, volatile=True)
 
             with torch.no_grad():
 

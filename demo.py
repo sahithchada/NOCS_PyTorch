@@ -48,17 +48,6 @@ model = modellib.MaskRCNN(model_dir=MODEL_DIR, config=config)
 if config.GPU_COUNT:
     model = model.cuda()
 
-# # Load weights trained on MS-COCO
-# pretrained_weights = torch.load(COCO_MODEL_PATH)
-# model_state_dict = model.state_dict()
-# for key in model_state_dict.keys():
-#     if key in pretrained_weights:
-#         # If the layer exists in pretrained weights, copy the weights
-#         model_state_dict[key] = pretrained_weights[key]
-#     else:
-#         # If the layer does not exist in pretrained weights, initialize with random weights
-#         shape = model_state_dict[key].shape
-#         model_state_dict[key] = torch.randn(shape).normal_(mean=0, std=3.0)
 
 #  real classes
 coco_names = ['BG', 'person', 'bicycle', 'car', 'motorcycle', 'airplane',
@@ -106,10 +95,8 @@ model = modellib.MaskRCNN(config=config, model_dir=MODEL_DIR)
 
 model.load_state_dict(torch.load(TRAINED_PATH))
 
-# Here we decide to use coco imgs or pngs from NOCS data
+# Here we get all file names in image dir
 file_names = [f for f in os.listdir(IMAGE_DIR) if f.endswith(( '.png'))]
-# file_names = [f for f in os.listdir(IMAGE_DIR) if f.endswith(( '.jpg'))]
-
 
 # Decide between random choice or run on certain image
 file_name = random.choice(file_names)
@@ -134,7 +121,3 @@ visualize.display_instances(image, rois, masks, class_ids, synset_names,file_nam
 plt.figure()
 plt.imshow(masks.sum(2))
 plt.savefig("output_images/mask_out.png")
-
-
-# plt.savefig("output_images/output.png")
-# plt.show()
