@@ -27,8 +27,8 @@ MODEL_DIR = os.path.join(ROOT_DIR, "logs")
 # project (See README file for details)
 
 COCO_MODEL_PATH = os.path.join(ROOT_DIR, "models/mask_rcnn_coco.pth")
-MODEL_WEIGHTS_PATH = os.path.join(ROOT_DIR, "models/nocs_train20230416T0013/mask_rcnn_nocs_train_0010.pth")
-TRAINED_PATH = 'models/nocs_train20230416T1932/mask_rcnn_nocs_train_0010.pth'
+MODEL_WEIGHTS_PATH = os.path.join(ROOT_DIR, "models/nocs_train20230418T0205/mask_rcnn_nocs_train_0010.pth")
+TRAINED_PATH = 'models/nocs_train20230419T0004/mask_rcnn_nocs_train_0050.pth'
 
 # Directory of images to run detection on
 IMAGE_DIR = os.path.join(ROOT_DIR, "images")
@@ -116,44 +116,11 @@ model.load_state_dict(torch.load(TRAINED_PATH))
 # # Load the modified state dictionary into your model
 # model.load_state_dict(filtered_state_dict, strict=False)
 
-
-
-
-
 # # Load the updated state dictionary into the model
 # model.load_state_dict(model_state_dict)
 
 #model.load_state_dict(torch.load(COCO_MODEL_PATH))
 
-
-# COCO Class names
-# Index of the class in the list is its ID. For example, to get ID of
-# the teddy bear class, use: class_names.index('teddy bear')
-class_names = ['BG', 'person', 'bicycle', 'car', 'motorcycle', 'airplane',
-               'bus', 'train', 'truck', 'boat', 'traffic light',
-               'fire hydrant', 'stop sign', 'parking meter', 'bench', 'bird',
-               'cat', 'dog', 'horse', 'sheep', 'cow', 'elephant', 'bear',
-               'zebra', 'giraffe', 'backpack', 'umbrella', 'handbag', 'tie',
-               'suitcase', 'frisbee', 'skis', 'snowboard', 'sports ball',
-               'kite', 'baseball bat', 'baseball glove', 'skateboard',
-               'surfboard', 'tennis racket', 'bottle', 'wine glass', 'cup',
-               'fork', 'knife', 'spoon', 'bowl', 'banana', 'apple',
-               'sandwich', 'orange', 'broccoli', 'carrot', 'hot dog', 'pizza',
-               'donut', 'cake', 'chair', 'couch', 'potted plant', 'bed',
-               'dining table', 'toilet', 'tv', 'laptop', 'mouse', 'remote',
-               'keyboard', 'cell phone', 'microwave', 'oven', 'toaster',
-               'sink', 'refrigerator', 'book', 'clock', 'vase', 'scissors',
-               'teddy bear', 'hair drier', 'toothbrush']
-
-# Load a random image from the images folder
-'''
-file_names = next(os.walk(IMAGE_DIR))[2]
-image = skimage.io.imread(os.path.join(IMAGE_DIR, random.choice(file_names)))
-#image = skimage.io.imread(os.path.join(IMAGE_DIR, file_names[0]))
-'''
-
-
-#file_names = next(os.walk(IMAGE_DIR))[2]
 
 # Here we decide to use coco imgs or pngs from NOCS data
 file_names = [f for f in os.listdir(IMAGE_DIR) if f.endswith(( '.png'))]
@@ -176,11 +143,9 @@ r = results[0]
 
 rois, masks, class_ids, scores, coords = r['rois'], r['masks'], r['class_ids'], r['scores'],r['coords']
 
-print(np.sum(coords[0]))
-
 visualize.plot_nocs(coords,file_name)
 
-visualize.display_instances(image, rois, masks, class_ids, class_names,file_name,scores)
+visualize.display_instances(image, rois, masks, class_ids, synset_names,file_name,scores)
 
 
 # plt.savefig("output_images/output.png")

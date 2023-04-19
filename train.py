@@ -1,6 +1,7 @@
 import os
 import time
 import numpy as np
+import skimage.io
 
 # Download and install the Python COCO tools from https://github.com/waleedka/coco
 # That's a fork from the original https://github.com/pdollar/coco with a bug
@@ -12,6 +13,9 @@ from pycocotools.coco import COCO
 from pycocotools.cocoeval import COCOeval
 from pycocotools import mask as maskUtils
 from skimage import exposure
+import matplotlib.pyplot as plt
+import visualize
+import random
 
 import zipfile
 import urllib.request
@@ -38,6 +42,7 @@ COCO_MODEL_PATH = os.path.join(ROOT_DIR, "models/mask_rcnn_coco.pth")
 # through the command line argument --logs
 DEFAULT_LOGS_DIR = os.path.join(ROOT_DIR, "logs")
 DEFAULT_DATASET_YEAR = "2014"
+IMAGE_DIR = os.path.join(ROOT_DIR, "images")
 
 ############################################################
 #  Configurations
@@ -70,6 +75,7 @@ class Nocs_train_config(Config):
 
     # Number of classes (including background)
     NUM_CLASSES = 1 + 6  # background + 6 object categories
+    # NUM_CLASSES = 1 + 80  # background + 6 object categories
     MEAN_PIXEL = np.array([[ 120.66209412, 114.70348358, 105.81269836]])
 
     IMAGE_MIN_DIM = 480
@@ -366,44 +372,48 @@ class SyntheticData(utils.Dataset):
         image_ids = range(10*num_total_folders)
         color_mean = np.zeros((0, 3), dtype=np.float32)
         # Add images
-        for i in image_ids:
-            image_id = int(i) % 10
-            folder_id = int(i) // 10
+        for folder_id in folder_list:
 
-            image_path = os.path.join(image_dir, '{:05d}'.format(folder_id), '{:04d}'.format(image_id))
-            color_path = image_path + '_color.png'
-            if not os.path.exists(color_path):
-                continue
-            
-            meta_path = os.path.join(image_dir, '{:05d}'.format(folder_id), '{:04d}_meta.txt'.format(image_id))
-            inst_dict = {}
-            with open(meta_path, 'r') as f:
-                for line in f:
-                    line_info = line.split(' ')
-                    inst_id = int(line_info[0])  ##one-indexed
-                    cls_id = int(line_info[1])  ##zero-indexed
-                    # skip background objs
-                    # symmetry_id = int(line_info[2])
-                    inst_dict[inst_id] = cls_id
+            folder_id = int(folder_id)
 
-            width = self.config.IMAGE_MAX_DIM  # meta_data['viewport_size_x'].flatten()[0]
-            height = self.config.IMAGE_MIN_DIM  # meta_data['viewport_size_y'].flatten()[0]
+            for i in range(10):
 
-            self.add_image(
-                source=source,
-                image_id=image_id,
-                path=image_path,
-                width=width,
-                height=height,
-                inst_dict=inst_dict)
+                image_id = i
 
-            if if_calculate_mean:
-                image_file = image_path + '_color.png'
-                image = cv2.imread(image_file).astype(np.float32)
-                print(i)
-                color_mean_image = np.mean(image, axis=(0, 1))[:3]
-                color_mean_image = np.expand_dims(color_mean_image, axis=0)
-                color_mean = np.append(color_mean, color_mean_image, axis=0)
+                image_path = os.path.join(image_dir, '{:05d}'.format(folder_id), '{:04d}'.format(image_id))
+                color_path = image_path + '_color.png'
+                if not os.path.exists(color_path):
+                    continue
+                
+                meta_path = os.path.join(image_dir, '{:05d}'.format(folder_id), '{:04d}_meta.txt'.format(image_id))
+                inst_dict = {}
+                with open(meta_path, 'r') as f:
+                    for line in f:
+                        line_info = line.split(' ')
+                        inst_id = int(line_info[0])  ##one-indexed
+                        cls_id = int(line_info[1])  ##zero-indexed
+                        # skip background objs
+                        # symmetry_id = int(line_info[2])
+                        inst_dict[inst_id] = cls_id
+
+                width = self.config.IMAGE_MAX_DIM  # meta_data['viewport_size_x'].flatten()[0]
+                height = self.config.IMAGE_MIN_DIM  # meta_data['viewport_size_y'].flatten()[0]
+
+                self.add_image(
+                    source=source,
+                    image_id=image_id,
+                    path=image_path,
+                    width=width,
+                    height=height,
+                    inst_dict=inst_dict)
+
+                if if_calculate_mean:
+                    image_file = image_path + '_color.png'
+                    image = cv2.imread(image_file).astype(np.float32)
+                    print(i)
+                    color_mean_image = np.mean(image, axis=(0, 1))[:3]
+                    color_mean_image = np.expand_dims(color_mean_image, axis=0)
+                    color_mean = np.append(color_mean, color_mean_image, axis=0)
 
         if if_calculate_mean:
             dataset_color_mean = np.mean(color_mean[::-1], axis=0)
@@ -683,30 +693,6 @@ class SyntheticData(utils.Dataset):
         return image, masks, coords, class_ids, scales, domain_label
 
 
-def load_weights(self, model, filepath, exclude=None):
-    """
-    Loads weights from a PyTorch checkpoint to the PyTorch model.
-    
-    Args:
-    - filepath (str): The path to the PyTorch checkpoint file (.pth).
-    - by_name (bool): Whether to load weights by name or by topology.
-    - exclude (list): A list of layer names to exclude from loading.
-    """
-
-    # Exclude some layers
-    if exclude:
-        model_dict = model.state_dict()
-        for layer_name in exclude:
-            del model_dict[layer_name]
-        model.load_state_dict(model_dict)
-
-    else:
-        model.load_state_dict(torch.load(filepath))
-
-
-    # Update the log directory
-    self.set_log_dir(filepath)
-
 #main training   
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
@@ -717,7 +703,6 @@ if __name__ == '__main__':
     print('Using GPU {}.'.format(args.gpu))
 
     config = Nocs_train_config()
-    #config.display()
 
     camera_train_dir = os.path.join('data', 'train')
     camera_val_dir=os.path.join('data', 'val')
@@ -738,6 +723,7 @@ if __name__ == '__main__':
                   'keyboard', 'cell phone', 'microwave', 'oven', 'toaster',
                   'sink', 'refrigerator', 'book', 'clock', 'vase', 'scissors',
                   'teddy bear', 'hair drier', 'toothbrush']
+    
 
     # 0, 40, 46, rand, rand, 64, 42
     synset_names = ['BG', #0
@@ -768,13 +754,23 @@ if __name__ == '__main__':
     model = modellib.MaskRCNN(config=config, model_dir=MODEL_DIR)
     # Load the state dictionary of the pre-trained model
     pretrained_state_dict = torch.load(COCO_MODEL_PATH)
+
     # List of layers to exclude, changed 
-    exclude_layers = ["mrcnn_class_logits", "mrcnn_bbox_fc", "mrcnn_bbox", "mrcnn_mask","mask","classifier"]
-    # exclude_layers = ["mrcnn_class_logits", "mrcnn_bbox_fc", "mrcnn_bbox", "mrcnn_mask"]
+    exclude_layers = ["classifier","mask"]
+
     # Filter out the layers to exclude from the state dictionary
     filtered_state_dict = {k: v for k, v in pretrained_state_dict.items() if not any(layer in k for layer in exclude_layers)}
+    # filtered_state_dict = pretrained_state_dict
 
     mismatches = ["classifier.linear_class.weight","classifier.linear_class.bias","classifier.linear_bbox.weight","classifier.linear_bbox.bias","mask.conv5.weight","mask.conv5.bias"]
+
+
+    # classifier.linear_class.weight: og: ([81, 1024]) changed: torch.Size([7, 1024]).
+	# classifier.linear_class.bias: og: torch.Size([81]) changed: torch.Size([7]).
+	# classifier.linear_bbox.weight: og: torch.Size([324, 1024]) changed: torch.Size([28, 1024]).
+	# classifier.linear_bbox.bias: og: torch.Size([324]) changed: torch.Size([28]).
+	# mask.conv5.weight: og: torch.Size([81, 256, 1, 1]) changed: torch.Size([7, 256, 1, 1]).
+	# mask.conv5.bias: og: torch.Size([81]) changed: torch.Size([7]).
 
     # for i in range(len(mismatches)):
 
@@ -785,16 +781,20 @@ if __name__ == '__main__':
     #         w2 = weights[[64,42]]
     #         w3 = torch.rand_like(w2)
 
-    #         final_weights = torch.vstack((w1,w2,w3))
+    #         final_weights = torch.vstack((w1,w3,w2))
     #         pass
 
+    #     # weights shape = (324,1024)
+    #     # expected 28,1024
+    #     # 0:3, 160:163, 184:187, 256:259, 168:171
     #     elif weights.shape[0] == 324 and len(weights.shape) > 1:
     #         weights = torch.reshape(weights, (81,4,1024))
+    #         # weights = weights.view(weights.size()[0], -1, 4)
     #         w1 = weights[[0,40,46]]
     #         w2 = weights[[64,42]]
     #         w3 = torch.rand_like(w2)
 
-    #         final_weights = torch.vstack((w1.flatten(end_dim=-2),w2.flatten(end_dim=-2),w3.flatten(end_dim=-2)))
+    #         final_weights = torch.vstack((w1.flatten(end_dim=-2),w3.flatten(end_dim=-2),w2.flatten(end_dim=-2)))
 
     #     elif weights.shape[0] == 324:
     #         weights = torch.reshape(weights, (81,4))
@@ -802,69 +802,47 @@ if __name__ == '__main__':
     #         w2 = weights[[64,42]]
     #         w3 = torch.rand_like(w2)
 
-    #         final_weights = torch.cat((w1.flatten(),w2.flatten(),w3.flatten()))
+    #         final_weights = torch.cat((w1.flatten(),w3.flatten(),w2.flatten()))
     #     else:
     #         w1 = weights[[0,40,46]]
     #         w2 = weights[[64,42]]
     #         w3 = torch.rand_like(w2)
 
-    #         final_weights = torch.cat((w1,w2,w3))
+    #         final_weights = torch.cat((w1,w3,w2))
 
     #     filtered_state_dict[mismatches[i]] = final_weights
 
-    # # filtered_state_dict['classifier.linear_class.weight'] = torch.filtered_state_dict['classifier.linear_class.weight'][[0,],:]
-
-
-    # Load the modified state dictionary into your model
     model.load_state_dict(filtered_state_dict, strict=False)
 
-
-    # model_dict = model.state_dict()
-    # checkpoint_dict = {k: v for k, v in pretrained_state_dict.items() if k not in exclude_layers}
-    # model_dict.update(checkpoint_dict)
-
-    # model.load_state_dict(model_dict)
-
     # # Update the log directory
-    # model.set_log_dir(COCO_MODEL_PATH)
+    model.set_log_dir(COCO_MODEL_PATH)
 
     if config.GPU_COUNT > 0:
         device = torch.device('cuda')
     else:
         device = torch.device('cpu')
 
-    # device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    print("Model to:",device)
+
     model.to(device)
 
-    # print(next(model.parameters()).is_cuda)
-
-    #load data
-    # dataset_train = TrainData(camera_train_dir,transform = None)
-    # dataset_val=TrainData(camera_val_dir,transform = None)
-
-    camera_dir = camera_train_dir = os.path.join('data', 'camera')
+    camera_dir = os.path.join('data', 'camera')
+    # camera_dir = '../NOCS_CVPR2019/data/camera'
 
     trainset = SyntheticData(synset_names,'train')
     trainset.load_camera_scenes(camera_dir)
     trainset.prepare(class_map)
-
-    # # Looping though data loader
-    # train_set = modellib.Dataset(trainset, config, augment=True)
-
-    # for i,j in enumerate(train_set):
-        
-    #     pass
 
     valset = SyntheticData(synset_names,'val')
     valset.load_camera_scenes(camera_dir)
     valset.prepare(class_map)
 
 
-
-    #print("Training network heads")
+    # Training - Stage 1
+    print("Training network heads")
     model.train_model(trainset, valset,
                 learning_rate=config.LEARNING_RATE,
-                epochs=10,
+                epochs=50,
                 layers='heads')
 
     # Training - Stage 2

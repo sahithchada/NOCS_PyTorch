@@ -625,7 +625,7 @@ def detection_target_layer(proposals, gt_class_ids, gt_boxes, gt_masks, config):
 
     # Subsample ROIs. Aim for 33% positive
     # Positive ROIs
-    if torch.nonzero(positive_roi_bool).size():
+    if torch.nonzero(positive_roi_bool).size()[0]:
         positive_indices = torch.nonzero(positive_roi_bool)[:, 0]
 
         positive_count = int(config.TRAIN_ROIS_PER_IMAGE *
@@ -702,7 +702,7 @@ def detection_target_layer(proposals, gt_class_ids, gt_boxes, gt_masks, config):
     negative_roi_bool = roi_iou_max < 0.5
     negative_roi_bool = negative_roi_bool & no_crowd_bool
     # Negative ROIs. Add enough to maintain positive:negative ratio.
-    if torch.nonzero(negative_roi_bool).size() and positive_count>0:
+    if torch.nonzero(negative_roi_bool).size()[0] and positive_count>0:
         negative_indices = torch.nonzero(negative_roi_bool)[:, 0]
         r = 1.0 / config.ROI_POSITIVE_RATIO
         negative_count = int(r * positive_count - positive_count)
@@ -1156,7 +1156,7 @@ def compute_mrcnn_class_loss(target_class_ids, pred_class_logits):
     """
 
     # Loss
-    if target_class_ids.size():
+    if target_class_ids.size()[0]:
         loss = F.cross_entropy(pred_class_logits,target_class_ids.long())
     else:
         loss = Variable(torch.FloatTensor([0]), requires_grad=False)
@@ -1174,7 +1174,7 @@ def compute_mrcnn_bbox_loss(target_bbox, target_class_ids, pred_bbox):
     pred_bbox: [batch, num_rois, num_classes, (dy, dx, log(dh), log(dw))]
     """
 
-    if target_class_ids.size():
+    if target_class_ids.size()[0]:
         # Only positive ROIs contribute to the loss. And only
         # the right class_id of each ROI. Get their indicies.
         positive_roi_ix = torch.nonzero(target_class_ids > 0)[:, 0]
@@ -1204,7 +1204,7 @@ def compute_mrcnn_mask_loss(target_masks, target_class_ids, pred_masks):
     pred_masks: [batch, proposals, height, width, num_classes] float32 tensor
                 with values from 0 to 1.
     """
-    if target_class_ids.size():
+    if target_class_ids.size()[0]:
         # Only positive ROIs contribute to the loss. And only
         # the class specific mask of each ROI.
         positive_ix = torch.nonzero(target_class_ids > 0)[:, 0]
@@ -1263,6 +1263,8 @@ def load_image_gt(dataset, config, image_id, augment=False,
 
     if augment and dataset.subset == 'train':
         image, mask, coord, class_ids, scales, domain_label = dataset.load_augment_data(image_id)
+        # image = dataset.load_image(image_id)
+        # mask, coord, class_ids, scales, domain_label = dataset.load_mask(image_id)
     else:
         image = dataset.load_image(image_id)
         mask, coord, class_ids, scales, domain_label = dataset.load_mask(image_id)
@@ -1279,6 +1281,7 @@ def load_image_gt(dataset, config, image_id, augment=False,
         padding=config.IMAGE_PADDING)
     mask = utils.resize_mask(mask, scale, padding)
     coord = utils.resize_mask(coord, scale, padding)
+
 
     # Random horizontal flips.
     # if augment:
@@ -1310,8 +1313,6 @@ def load_image_gt(dataset, config, image_id, augment=False,
 
     # Image meta data
     image_meta = compose_image_meta(image_id, shape, window, active_class_ids)
-
-    # return image, image_meta, class_ids, bbox, mask
 
     if load_scale:
         return image, image_meta, bbox, mask, coord, domain_label, scales
@@ -1528,7 +1529,7 @@ def build_rpn_targets(image_shape, anchors, gt_boxes, config):
 
 
 class Dataset(torch.utils.data.Dataset):
-    def __init__(self, dataset, config, augment=True):
+    def __init__(self, dataset, config, augment=False):
         """A generator that returns images and corresponding target class ids,
             bounding box deltas, and masks.
 
@@ -1583,15 +1584,18 @@ class Dataset(torch.utils.data.Dataset):
         image, image_metas, gt_boxes, gt_masks, gt_coords, gt_domain_label = \
             load_image_gt(self.dataset, self.config, image_id, augment=self.augment,
                           use_mini_mask=self.config.USE_MINI_MASK)
-
+        
         # Skip images that have no instances. This can happen in cases
         # where we train on a subset of classes and the image doesn't
         # have any of the classes we care about.
         # if not np.any(gt_class_ids > 0):
         #     return None
-        
+
         if np.sum(gt_boxes) <= 0:
-            return None
+            rpn_bbox = 0
+            rpn_match = 0
+            gt_class_ids = 0
+            return image, image_metas, rpn_match, rpn_bbox, gt_class_ids, gt_boxes, gt_masks, gt_coords, gt_domain_label
 
         # RPN Targets
         rpn_match, rpn_bbox = build_rpn_targets(image.shape, self.anchors, gt_boxes, self.config)
@@ -1619,6 +1623,7 @@ class Dataset(torch.utils.data.Dataset):
         gt_masks = torch.from_numpy(gt_masks.astype(int).transpose(2, 0, 1)).float()
         gt_coords = torch.from_numpy(gt_coords)
         # gt_domain_label = torch.from_numpy(gt_domain_label)
+
 
         return images, image_metas, rpn_match, rpn_bbox, gt_class_ids, gt_boxes, gt_masks, gt_coords, gt_domain_label
 
@@ -2025,7 +2030,7 @@ class MaskRCNN(nn.Module):
             rois, target_class_ids, target_deltas, target_mask = \
                 detection_target_layer(rpn_rois, gt_class_ids, gt_boxes, gt_masks, self.config)
 
-            if not rois.size():
+            if not rois.size()[0]:
                 mrcnn_class_logits = Variable(torch.FloatTensor())
                 mrcnn_class = Variable(torch.IntTensor())
                 mrcnn_bbox = Variable(torch.FloatTensor())
@@ -2098,9 +2103,9 @@ class MaskRCNN(nn.Module):
 
         # Data generators
         train_set = Dataset(train_dataset, self.config, augment=True)
-        train_generator = torch.utils.data.DataLoader(train_set, batch_size=1, shuffle=False, num_workers=4)
-        val_set = Dataset(val_dataset, self.config, augment=True)
-        val_generator = torch.utils.data.DataLoader(val_set, batch_size=1, shuffle=False, num_workers=4)
+        train_generator = torch.utils.data.DataLoader(train_set, batch_size=1, shuffle=False, num_workers=1)
+        val_set = Dataset(val_dataset, self.config, augment=False)
+        val_generator = torch.utils.data.DataLoader(val_set, batch_size=1, shuffle=False, num_workers=1)
 
         # Train
         log("\nStarting at epoch {}. LR={}\n".format(self.epoch+1, learning_rate))
@@ -2131,7 +2136,7 @@ class MaskRCNN(nn.Module):
             # Statistics
             self.loss_history.append([loss, loss_rpn_class, loss_rpn_bbox, loss_mrcnn_class, loss_mrcnn_bbox, loss_mrcnn_mask])
             self.val_loss_history.append([val_loss, val_loss_rpn_class, val_loss_rpn_bbox, val_loss_mrcnn_class, val_loss_mrcnn_bbox, val_loss_mrcnn_mask])
-            visualize.plot_loss(self.loss_history, self.val_loss_history, save=True, log_dir=self.log_dir)
+            visualize.plot_loss2(self.loss_history, self.val_loss_history, save=True, log_dir=self.log_dir)
 
             # Save model
             torch.save(self.state_dict(), self.checkpoint_path.format(epoch))
@@ -2166,6 +2171,19 @@ class MaskRCNN(nn.Module):
             gt_coords = inputs[7]
             gt_domain_label = inputs[8]
 
+            if rpn_bbox.sum() == 0:
+                batch_count -= 1
+                print('HI')
+                continue
+
+            # plt.figure()
+            # plt.subplot(1,3,1)
+            # plt.imshow(images[0].permute(1,2,0))
+            # plt.subplot(1,3,2)
+            # plt.imshow(gt_masks[0].permute(1,2,0).sum(2))
+            # plt.subplot(1,3,3)
+            # plt.imshow(gt_coords[0].sum(2))
+            # plt.savefig("output_images/output.png")
             # image_metas as numpy array
             image_metas = image_metas.numpy()
 
@@ -2272,7 +2290,7 @@ class MaskRCNN(nn.Module):
                 rpn_class_logits, rpn_pred_bbox, target_class_ids, mrcnn_class_logits, target_deltas, mrcnn_bbox, target_mask, mrcnn_mask, pred_coords = \
                     self.predict([images, image_metas, gt_class_ids, gt_boxes, gt_masks], mode='training')
 
-                if not target_class_ids.size():
+                if not target_class_ids.size()[0]:
                     continue
 
                 # Compute losses
