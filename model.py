@@ -664,6 +664,11 @@ def detection_target_layer(proposals, gt_class_ids, gt_boxes, gt_masks,gt_coords
         transposed_coord_y = transposed_coords[:, :, :, 1:2]
         transposed_coord_z = transposed_coords[:, :, :, 2:3]       
     
+        if config.GPU_COUNT:
+            transposed_coord_x = transposed_coord_x.cuda()
+            transposed_coord_y = transposed_coord_y.cuda()
+            transposed_coord_z = transposed_coord_z.cuda()
+
         
         roi_coord_x = transposed_coord_x[roi_gt_box_assignment]
         roi_coord_y = transposed_coord_y[roi_gt_box_assignment]
@@ -856,8 +861,8 @@ def detection_target_layer(proposals, gt_class_ids, gt_boxes, gt_masks,gt_coords
             deltas = deltas.cuda()
             masks = masks.cuda()
             coord_x=coord_x.cuda()
-            coord_x=coord_y.cuda()
-            coord_x=coord_z.cuda()
+            coord_y=coord_y.cuda()
+            coord_z=coord_z.cuda()
 
     ##########COMPUTE FINAL  X,Y,Z,coords#############################
     '''
@@ -2428,12 +2433,12 @@ class MaskRCNN(nn.Module):
             mrcnn_coord_y_bin_value=pred_coords[1]
             mrcnn_coord_z_bin_value=pred_coords[2]
 
-            mrcnn_coords_bin = torch.stack([mrcnn_coord_x_bin_value, mrcnn_coord_y_bin_value, mrcnn_coord_z_bin_value], dim=-1)
-            coord_bin_loss = mrcnn_coord_bins_symmetry_loss(target_mask, target_coords, target_class_ids, target_domain_labels, mrcnn_coords_bin)
-            coord_x_bin_loss = coord_bin_loss[0].reshape(1, 1)
-            coord_y_bin_loss = coord_bin_loss[1].reshape(1, 1)
-            coord_z_bin_loss = coord_bin_loss[2].reshape(1, 1)
-            print(mrcnn_coords_bin)
+            # mrcnn_coords_bin = torch.stack([mrcnn_coord_x_bin_value, mrcnn_coord_y_bin_value, mrcnn_coord_z_bin_value], dim=-1)
+            # coord_bin_loss = mrcnn_coord_bins_symmetry_loss(target_mask, target_coords, target_class_ids, target_domain_labels, mrcnn_coords_bin)
+            # coord_x_bin_loss = coord_bin_loss[0].reshape(1, 1)
+            # coord_y_bin_loss = coord_bin_loss[1].reshape(1, 1)
+            # coord_z_bin_loss = coord_bin_loss[2].reshape(1, 1)
+            # print(mrcnn_coords_bin)
             # Compute losses
             rpn_class_loss, rpn_bbox_loss, mrcnn_class_loss, mrcnn_bbox_loss, mrcnn_mask_loss = compute_losses(rpn_match, rpn_bbox, rpn_class_logits, rpn_pred_bbox, target_class_ids, mrcnn_class_logits, target_deltas, mrcnn_bbox, target_mask, mrcnn_mask, pred_coords)
             loss = rpn_class_loss + rpn_bbox_loss + mrcnn_class_loss + mrcnn_bbox_loss + mrcnn_mask_loss
@@ -2513,8 +2518,8 @@ class MaskRCNN(nn.Module):
                     gt_masks = gt_masks.cuda()
 
                 # Run object detection
-                rpn_class_logits, rpn_pred_bbox, target_class_ids, mrcnn_class_logits, target_deltas, mrcnn_bbox, target_mask, mrcnn_mask, pred_coords = \
-                    self.predict([images, image_metas, gt_class_ids, gt_boxes, gt_masks], mode='training')
+                rpn_class_logits, rpn_pred_bbox, target_class_ids, mrcnn_class_logits, target_deltas,target_coords,mrcnn_bbox, target_mask, mrcnn_mask, pred_coords = \
+                self.predict([images, image_metas, gt_class_ids, gt_boxes, gt_masks,gt_coords,gt_domain_label], mode='training')
 
                 if not target_class_ids.size()[0]:
                     continue

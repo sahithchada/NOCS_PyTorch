@@ -27,8 +27,7 @@ MODEL_DIR = os.path.join(ROOT_DIR, "logs")
 # project (See README file for details)
 
 COCO_MODEL_PATH = os.path.join(ROOT_DIR, "models/mask_rcnn_coco.pth")
-MODEL_WEIGHTS_PATH = os.path.join(ROOT_DIR, "models/nocs_train20230418T0205/mask_rcnn_nocs_train_0010.pth")
-TRAINED_PATH = 'models/nocs_train20230419T0004/mask_rcnn_nocs_train_0050.pth'
+TRAINED_PATH = 'models/nocs_train20230419T0138/mask_rcnn_nocs_train_0015.pth'
 
 # Directory of images to run detection on
 IMAGE_DIR = os.path.join(ROOT_DIR, "images")
@@ -105,22 +104,7 @@ config.display()
 # Create an instance of your PyTorch MaskRCNN model with the given configuration
 model = modellib.MaskRCNN(config=config, model_dir=MODEL_DIR)
 
-
 model.load_state_dict(torch.load(TRAINED_PATH))
-# Load the state dictionary of the pre-trained model
-# pretrained_state_dict = torch.load(COCO_MODEL_PATH)
-# # List of layers to exclude, changed 
-# exclude_layers = ["mrcnn_class_logits", "mrcnn_bbox_fc", "mrcnn_bbox", "mrcnn_mask","mask","classifier"]
-# # Filter out the layers to exclude from the state dictionary
-# filtered_state_dict = {k: v for k, v in pretrained_state_dict.items() if not any(layer in k for layer in exclude_layers)}
-# # Load the modified state dictionary into your model
-# model.load_state_dict(filtered_state_dict, strict=False)
-
-# # Load the updated state dictionary into the model
-# model.load_state_dict(model_state_dict)
-
-#model.load_state_dict(torch.load(COCO_MODEL_PATH))
-
 
 # Here we decide to use coco imgs or pngs from NOCS data
 file_names = [f for f in os.listdir(IMAGE_DIR) if f.endswith(( '.png'))]
@@ -146,6 +130,10 @@ rois, masks, class_ids, scores, coords = r['rois'], r['masks'], r['class_ids'], 
 visualize.plot_nocs(coords,file_name)
 
 visualize.display_instances(image, rois, masks, class_ids, synset_names,file_name,scores)
+
+plt.figure()
+plt.imshow(masks.sum(2))
+plt.savefig("output_images/mask_out.png")
 
 
 # plt.savefig("output_images/output.png")
