@@ -29,6 +29,7 @@ from torchvision.ops import nms
 #from nms.nms_wrapper import nms
 #from roialign.roi_align.crop_and_resize import CropAndResizeFunction
 from torchvision.ops import RoIAlign
+from torchvision.ops import roi_align
 
 import skimage.io
 import matplotlib.pyplot as plt
@@ -704,18 +705,30 @@ def detection_target_layer(proposals, gt_class_ids, gt_boxes, gt_masks,gt_coords
             box_ids = box_ids.cuda()
         #feature_maps[i] = feature_maps[i].unsqueeze(0)  #CropAndResizeFunction needs batch dimension
         #pooled_features = CropAndResizeFunction(pool_size, pool_size, 0)(feature_maps[i], level_boxes, ind)
+        #feature_maps[i] = feature_maps[i].unsqueeze(0)  #CropAndResizeFunction needs batch dimension
+        #pooled_features = CropAndResizeFunction(pool_size, pool_size, 0)(feature_maps[i], level_boxes, ind)
 
+
+        # feature_maps_reshaped = torch.reshape(feature_maps[i], (1,n, h,w))
+
+
+        # roi_align1 = RoIAlign((pool_size, pool_size), spatial_scale=feature_maps[i].shape[1]/image_shape[0],sampling_ratio=-1)
+
+
+        # pooled_features=roi_align1(feature_maps_reshaped,level_boxes)
+        # pooled.append(pooled_features)
+        
         level_boxes = boxes[:, [1, 0, 3, 2]].clone()
         indexes = torch.zeros(level_boxes.shape[0], 1)
         if config.GPU_COUNT:
             indexes = indexes.cuda()
-
+        '''
         level_boxes = torch.cat((indexes, level_boxes), dim=1)
         n,h,w=roi_masks.shape
         feature_maps_reshaped = torch.reshape(roi_masks.unsqueeze(1), (1,n, h,w))
 
-
-        roi_align1 = RoIAlign((config.MASK_SHAPE[0], config.MASK_SHAPE[1]), spatial_scale=h,sampling_ratio=-1)
+        
+        roi_align1 = RoIAlign((config.MASK_SHAPE[0], config.MASK_SHAPE[1]), spatial_scale=1,sampling_ratio=-1)
 
         masks=roi_align1(feature_maps_reshaped,level_boxes)
         
@@ -723,10 +736,35 @@ def detection_target_layer(proposals, gt_class_ids, gt_boxes, gt_masks,gt_coords
         #masks = masks.squeeze(1)
         masks=torch.reshape(masks,(-1,masks.shape[2],masks.shape[3]))
 
+        masks=Variable(masks.data, requires_grad=False)
+        '''
+        masks = roi_masks.unsqueeze(1)
+        boxes_and_ids = torch.cat((boxes, box_ids.view(-1, 1)), dim=1)  # Concatenate boxes and box_ids
+        masks = roi_align(masks, boxes_and_ids, output_size=(config.MASK_SHAPE[0], config.MASK_SHAPE[1]), spatial_scale=1.0)
+        masks = Variable(masks.data, requires_grad=False)
+        masks = masks.squeeze(1)
         # Threshold mask pixels at 0.5 to have GT masks be 0 or 1 to use with
         # binary cross entropy loss.
         masks = torch.round(masks)
 
+        roi_coord_x = roi_coord_x.unsqueeze(1)
+        roi_coord_x = roi_align(roi_coord_x, boxes_and_ids, output_size=(config.COORD_SHAPE[0], config.COORD_SHAPE[1]), spatial_scale=1.0)
+        roi_coord_x = Variable(roi_coord_x.data, requires_grad=False)
+        coord_x = roi_coord_x.squeeze(1)
+
+        roi_coord_y = roi_coord_y.unsqueeze(1)
+        roi_coord_y = roi_align(roi_coord_y, boxes_and_ids, output_size=(config.COORD_SHAPE[0], config.COORD_SHAPE[1]), spatial_scale=1.0)
+        roi_coord_y = Variable(roi_coord_y.data, requires_grad=False)
+        coord_y = roi_coord_y.squeeze(1)
+
+        roi_coord_z = roi_coord_z.unsqueeze(1)
+        roi_coord_z = roi_align(roi_coord_z, boxes_and_ids, output_size=(config.COORD_SHAPE[0], config.COORD_SHAPE[1]), spatial_scale=1.0)
+        roi_coord_z = Variable(roi_coord_z.data, requires_grad=False)
+        coord_z = roi_coord_z.squeeze(1)
+
+
+        '''
+        n,h,w=roi_masks.shape
         roi_align_x = RoIAlign((config.COORD_SHAPE[0], config.COORD_SHAPE[1]), spatial_scale=h,sampling_ratio=-1)
         roi_align_y = RoIAlign((config.COORD_SHAPE[0], config.COORD_SHAPE[1]), spatial_scale=h,sampling_ratio=-1)
         roi_align_z = RoIAlign((config.COORD_SHAPE[0], config.COORD_SHAPE[1]), spatial_scale=h,sampling_ratio=-1)
@@ -743,7 +781,7 @@ def detection_target_layer(proposals, gt_class_ids, gt_boxes, gt_masks,gt_coords
         coord_x=torch.reshape(coord_x,(-1,coord_x.shape[2],coord_x.shape[3]))
         coord_y=torch.reshape(coord_y,(-1,coord_y.shape[2],coord_y.shape[3]))
         coord_z=torch.reshape(coord_z,(-1,coord_z.shape[2],coord_z.shape[3]))
-
+        '''
 
     else:
         positive_count = 0
