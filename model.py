@@ -448,7 +448,6 @@ def pyramid_roi_align(inputs, pool_size, image_shape):
     #print(feature_maps[3].shape)
 
     # Assign each ROI to a level in the pyramid based on the ROI area.
-    # print(boxes.shape)
     y1, x1, y2, x2 = boxes.chunk(4, dim=1)
     h = y2 - y1
     w = x2 - x1
@@ -569,6 +568,7 @@ def bbox_overlaps(boxes1, boxes2):
 def detection_target_layer(proposals, gt_class_ids, gt_boxes, gt_masks,gt_coords,config):
     """Subsamples proposals and generates target box refinment, class_ids,
     and masks for each.
+    #detection_targets_graph
 
     Inputs:
     proposals: [batch, N, (y1, x1, y2, x2)] in normalized coordinates. Might
@@ -589,7 +589,7 @@ def detection_target_layer(proposals, gt_class_ids, gt_boxes, gt_masks,gt_coords
     target_mask: [batch, TRAIN_ROIS_PER_IMAGE, height, width)
                  Masks cropped to bbox boundaries and resized to neural
                  network output size.
-    terget_coord: [[batch, TRAIN_ROIS_PER_IMAGE, height, width,3)]
+    target_coord: [[batch, TRAIN_ROIS_PER_IMAGE, height, width,3)]
     """
 
     # Currently only supports batchsize 1
@@ -746,11 +746,19 @@ def detection_target_layer(proposals, gt_class_ids, gt_boxes, gt_masks,gt_coords
 
         masks=Variable(masks.data, requires_grad=False)
         '''
+        print("roi_masks")
+        print(torch.max(roi_masks))
         masks = roi_masks.unsqueeze(1)
+        print(torch.max(masks))
+        print("hi1")
         boxes_and_ids = torch.cat((boxes, box_ids.view(-1, 1)), dim=1)  # Concatenate boxes and box_ids
         masks = roi_align(masks, boxes_and_ids, output_size=(config.MASK_SHAPE[0], config.MASK_SHAPE[1]), spatial_scale=1.0)
+        print(torch.max(masks))
+        print("hi2")
         masks = Variable(masks.data, requires_grad=False)
+        print(torch.max(masks))
         masks = masks.squeeze(1)
+        print(torch.max(masks))
         # Threshold mask pixels at 0.5 to have GT masks be 0 or 1 to use with
         # binary cross entropy loss.
         masks = torch.round(masks)
@@ -1523,7 +1531,7 @@ def mrcnn_coord_bins_symmetry_loss(target_masks, target_coords, target_class_ids
         # Tile y_pred to match the shape of y_true_stack
         y_pred_stack = y_pred.repeat(1, 1, 1, y_true_stack.size(3), 1, 1)
 
-        # print(y_pred_stack.permute(0,5,1,2,3,4).shape,y_true_bins_stack.argmax(dim=-1).shape)
+        # 
 
         cross_loss = torch.nn.functional.cross_entropy(y_pred_stack.permute(0,5,1,2,3,4), y_true_bins_stack,reduction='none') # check the value of this
 
@@ -1531,11 +1539,13 @@ def mrcnn_coord_bins_symmetry_loss(target_masks, target_coords, target_class_ids
 
         # cross_loss = F.nll_loss(y_pred_stack.permute(0,5,1,2,3,4).log(), y_true_bins_stack,reduction='none') # check the value of this
 
-        # mask = target_masks[positive_ix]
+        # #mask = target_masks[positive_ix]
+        mask = torch.index_select(target_masks, 0, positive_ix) ## shape: [num_pixels_in_mask, 6, 3]
         mask = torch.index_select(target_masks, 0, positive_ix) ## shape: [num_pixels_in_mask, 6, 3]
         reshape_mask = mask.reshape(mask.shape[0], mask.shape[1], mask.shape[2], 1, 1)
+        ## shape: [num_pos_rois, height, width, 1, 1]
 
-        num_of_pixels = mask.sum(dim=[1, 2]) + 0.00001
+        num_of_pixels = mask.sum(dim=[1, 2]) + 0.00001 ## shape: [num_pos_rois]
 
         cross_loss_in_mask = cross_loss * reshape_mask
         sum_loss_in_mask = cross_loss_in_mask.sum(dim=[1,2])
@@ -1556,6 +1566,8 @@ def mrcnn_coord_bins_symmetry_loss(target_masks, target_coords, target_class_ids
         # sym_loss = tf.reduce_mean(mean_loss_in_mask, axis=0)  ## shape:[3]
 
         # sum_loss_in_mask = cross_loss_in_mask.sum(dim=[1, 2, 3, 4]) / num_of_pixels
+        print(sym_loss)
+        return sym_loss
 
         # return sum_loss_in_mask.mean()
 
@@ -2343,7 +2355,6 @@ class MaskRCNN(nn.Module):
             mrcnn_coord_z_bin, mrcnn_coord_z_feature = self.nocs_head_z(mrcnn_feature_maps, detection_boxes)
 
             coord_bin_values_module = CoordBinValues(self.config.NUM_BINS)
-            # print(self.config.NUM_BINS)
             mrcnn_coord_x_bin_value = coord_bin_values_module(mrcnn_coord_x_bin)
             mrcnn_coord_y_bin_value = coord_bin_values_module(mrcnn_coord_y_bin)
             mrcnn_coord_z_bin_value = coord_bin_values_module(mrcnn_coord_z_bin)
