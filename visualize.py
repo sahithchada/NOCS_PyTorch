@@ -593,6 +593,54 @@ def plot_loss2(loss, val_loss, save=True, log_dir=None):
         plt.show(block=False)
         plt.pause(0.1)
 
+    plt.figure("x_coord_loss")
+    plt.gcf().clear()
+    plt.subplot(2,1,1)
+    plt.plot(loss[:, 6], label='train')
+    plt.subplot(2,1,2)
+    plt.plot(val_loss[:, 6], label='valid')
+    plt.xlabel('epoch')
+    plt.ylabel('loss')
+    plt.legend()
+    if save:
+        save_path = os.path.join(log_dir, "x_coord_loss.png")
+        plt.savefig(save_path)
+    else:
+        plt.show(block=False)
+        plt.pause(0.1)
+
+    plt.figure("y_coord_loss")
+    plt.gcf().clear()
+    plt.subplot(2,1,1)
+    plt.plot(loss[:, 7], label='train')
+    plt.subplot(2,1,2)
+    plt.plot(val_loss[:, 7], label='valid')
+    plt.xlabel('epoch')
+    plt.ylabel('loss')
+    plt.legend()
+    if save:
+        save_path = os.path.join(log_dir, "y_coord_loss.png")
+        plt.savefig(save_path)
+    else:
+        plt.show(block=False)
+        plt.pause(0.1)
+
+    plt.figure("z_coord_loss")
+    plt.gcf().clear()
+    plt.subplot(2,1,1)
+    plt.plot(loss[:, 8], label='train')
+    plt.subplot(2,1,2)
+    plt.plot(val_loss[:, 8], label='valid')
+    plt.xlabel('epoch')
+    plt.ylabel('loss')
+    plt.legend()
+    if save:
+        save_path = os.path.join(log_dir, "z_coord_loss.png")
+        plt.savefig(save_path)
+    else:
+        plt.show(block=False)
+        plt.pause(0.1)
+
 
 
 def plot_nocs(coords,fl_name):

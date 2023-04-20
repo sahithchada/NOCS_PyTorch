@@ -70,7 +70,7 @@ class CocoConfig(Config):
 class Nocs_train_config(Config):
     # config file for nocs training, derives from base config  
     NAME="NOCS_train"
-    GPU_COUNT = 0
+    GPU_COUNT = 1
     IMAGES_PER_GPU = 1
 
     # Number of classes (including background)
@@ -758,11 +758,11 @@ if __name__ == '__main__':
     pretrained_state_dict = torch.load(COCO_MODEL_PATH)
 
     # List of layers to exclude, changed 
-    exclude_layers = ["classifier","mask"]
+    # exclude_layers = ["classifier","mask"]
 
     # Filter out the layers to exclude from the state dictionary
-    filtered_state_dict = {k: v for k, v in pretrained_state_dict.items() if not any(layer in k for layer in exclude_layers)}
-    # filtered_state_dict = pretrained_state_dict
+    # filtered_state_dict = {k: v for k, v in pretrained_state_dict.items() if not any(layer in k for layer in exclude_layers)}
+    filtered_state_dict = pretrained_state_dict
 
     mismatches = ["classifier.linear_class.weight","classifier.linear_class.bias","classifier.linear_bbox.weight","classifier.linear_bbox.bias","mask.conv5.weight","mask.conv5.bias"]
 
@@ -776,45 +776,45 @@ if __name__ == '__main__':
     mask.conv5.bias: og: torch.Size([81]) changed: torch.Size([7]). 
     """
 
-    # for i in range(len(mismatches)):
+    for i in range(len(mismatches)):
 
-    #     weights = filtered_state_dict[mismatches[i]]
+        weights = filtered_state_dict[mismatches[i]]
 
-    #     if weights.shape[0] == 81 and weights.dim() > 1:
-    #         w1 = weights[[0,40,46]]
-    #         w2 = weights[[64,42]]
-    #         w3 = torch.rand_like(w2)
+        if weights.shape[0] == 81 and weights.dim() > 1:
+            w1 = weights[[0,40,46]]
+            w2 = weights[[64,42]]
+            w3 = torch.rand_like(w2)
 
-    #         final_weights = torch.vstack((w1,w3,w2))
-    #         pass
+            final_weights = torch.vstack((w1,w3,w2))
+            pass
 
-    #     # weights shape = (324,1024)
-    #     # expected 28,1024
-    #     # 0:3, 160:163, 184:187, 256:259, 168:171
-    #     elif weights.shape[0] == 324 and len(weights.shape) > 1:
-    #         weights = torch.reshape(weights, (81,4,1024))
-    #         # weights = weights.view(weights.size()[0], -1, 4)
-    #         w1 = weights[[0,40,46]]
-    #         w2 = weights[[64,42]]
-    #         w3 = torch.rand_like(w2)
+        # weights shape = (324,1024)
+        # expected 28,1024
+        # 0:3, 160:163, 184:187, 256:259, 168:171
+        elif weights.shape[0] == 324 and len(weights.shape) > 1:
+            weights = torch.reshape(weights, (81,4,1024))
+            # weights = weights.view(weights.size()[0], -1, 4)
+            w1 = weights[[0,40,46]]
+            w2 = weights[[64,42]]
+            w3 = torch.rand_like(w2)
 
-    #         final_weights = torch.vstack((w1.flatten(end_dim=-2),w3.flatten(end_dim=-2),w2.flatten(end_dim=-2)))
+            final_weights = torch.vstack((w1.flatten(end_dim=-2),w3.flatten(end_dim=-2),w2.flatten(end_dim=-2)))
 
-    #     elif weights.shape[0] == 324:
-    #         weights = torch.reshape(weights, (81,4))
-    #         w1 = weights[[0,40,46]]
-    #         w2 = weights[[64,42]]
-    #         w3 = torch.rand_like(w2)
+        elif weights.shape[0] == 324:
+            weights = torch.reshape(weights, (81,4))
+            w1 = weights[[0,40,46]]
+            w2 = weights[[64,42]]
+            w3 = torch.rand_like(w2)
 
-    #         final_weights = torch.cat((w1.flatten(),w3.flatten(),w2.flatten()))
-    #     else:
-    #         w1 = weights[[0,40,46]]
-    #         w2 = weights[[64,42]]
-    #         w3 = torch.rand_like(w2)
+            final_weights = torch.cat((w1.flatten(),w3.flatten(),w2.flatten()))
+        else:
+            w1 = weights[[0,40,46]]
+            w2 = weights[[64,42]]
+            w3 = torch.rand_like(w2)
 
-    #         final_weights = torch.cat((w1,w3,w2))
+            final_weights = torch.cat((w1,w3,w2))
 
-    #     filtered_state_dict[mismatches[i]] = final_weights
+        filtered_state_dict[mismatches[i]] = final_weights
 
     model.load_state_dict(filtered_state_dict, strict=False)
 
