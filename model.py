@@ -597,6 +597,10 @@ def detection_target_layer(proposals, gt_class_ids, gt_boxes, gt_masks,gt_coords
     gt_masks = gt_masks.squeeze(0)
     gt_coords=gt_coords.squeeze(0)
     
+    plt.figure()
+    plt.imshow(gt_masks.cpu().sum(0))
+    plt.savefig('output_images/mask1.png')
+
     # Handle COCO crowds
     # A crowd box in COCO is a bounding box around several instances. Exclude
     # them from training. A crowd box is given a negative class ID.
@@ -1327,6 +1331,9 @@ def compute_mrcnn_mask_loss(target_masks, target_class_ids, pred_masks):
     pred_masks: [batch, proposals, height, width, num_classes] float32 tensor
                 with values from 0 to 1.
     """
+
+
+
     if target_class_ids.size()[0]:
         # Only positive ROIs contribute to the loss. And only
         # the class specific mask of each ROI.
@@ -2399,14 +2406,6 @@ class MaskRCNN(nn.Module):
             # plt.savefig("output_images/output.png")
             # image_metas as numpy array
             image_metas = image_metas.numpy()
-
-            # Wrap in variables
-            images = Variable(images)
-            rpn_match = Variable(rpn_match)
-            rpn_bbox = Variable(rpn_bbox)
-            gt_class_ids = Variable(gt_class_ids)
-            gt_boxes = Variable(gt_boxes)
-            gt_masks = Variable(gt_masks)
 
             # To GPU
             if self.config.GPU_COUNT:

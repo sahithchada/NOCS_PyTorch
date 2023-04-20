@@ -111,6 +111,8 @@ class Nocs_train_config(Config):
     COORD_POOL_SIZE = 14
     COORD_SHAPE = [28, 28]
 
+    USE_MINI_MASK = False
+
 ############################################################
 #  Dataset
 ############################################################
