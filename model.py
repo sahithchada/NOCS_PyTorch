@@ -599,9 +599,9 @@ def detection_target_layer(proposals, gt_class_ids, gt_boxes, gt_masks,gt_coords
     gt_masks = gt_masks.squeeze(0)
     gt_coords=gt_coords.squeeze(0)
     
-    plt.figure()
-    plt.imshow(gt_masks.cpu().sum(0))
-    plt.savefig('output_images/mask1.png')
+    # plt.figure()
+    # plt.imshow(gt_masks.cpu().sum(0))
+    # plt.savefig('output_images/mask1.png')
 
     # Handle COCO crowds
     # A crowd box in COCO is a bounding box around several instances. Exclude
@@ -2389,7 +2389,7 @@ class MaskRCNN(nn.Module):
             rois, target_class_ids, target_deltas, target_mask,target_coord_x, target_coord_y, target_coord_z = \
                 detection_target_layer(rpn_rois, gt_class_ids, gt_boxes, gt_masks,gt_coords, self.config)
             target_coords = torch.stack([target_coord_x, target_coord_y, target_coord_z])
-            print(target_coords.shape)
+            # print(target_coords.shape)
             if not rois.size()[0]:
                 mrcnn_class_logits = Variable(torch.FloatTensor())
                 mrcnn_class = Variable(torch.IntTensor())
@@ -2539,15 +2539,6 @@ class MaskRCNN(nn.Module):
             gt_coords = inputs[7]
             gt_domain_label = inputs[8]
 
-            plt.figure()
-            plt.subplot(1,3,1)
-            plt.imshow(images[0].permute(1,2,0))
-            plt.subplot(1,3,2)
-            plt.imshow(gt_masks[0].permute(1,2,0).sum(2))
-            plt.subplot(1,3,3)
-            plt.imshow(gt_coords[0].sum(2))
-            plt.savefig('output_images/myfig2.png')
-
             if rpn_bbox.sum() == 0:
                 batch_count -= 1
                 print('HI')
@@ -2635,7 +2626,9 @@ class MaskRCNN(nn.Module):
         loss_mrcnn_class_sum = 0
         loss_mrcnn_bbox_sum = 0
         loss_mrcnn_mask_sum = 0
-        loss_coord_sum = 0
+        loss_x_coord_sum = 0
+        loss_y_coord_sum = 0
+        loss_z_coord_sum = 0
 
         for inputs in datagenerator:
             images = inputs[0]
