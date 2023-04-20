@@ -34,6 +34,8 @@ from torchvision.ops import roi_align
 import skimage.io
 import matplotlib.pyplot as plt
 import cv2
+import functools
+import operator
 
 
 ############################################################
@@ -446,7 +448,7 @@ def pyramid_roi_align(inputs, pool_size, image_shape):
     #print(feature_maps[3].shape)
 
     # Assign each ROI to a level in the pyramid based on the ROI area.
-    print(boxes.shape)
+    # print(boxes.shape)
     y1, x1, y2, x2 = boxes.chunk(4, dim=1)
     h = y2 - y1
     w = x2 - x1
@@ -666,7 +668,13 @@ def detection_target_layer(proposals, gt_class_ids, gt_boxes, gt_masks,gt_coords
         transposed_coords = gt_coords.permute(2, 0, 1, 3)
         transposed_coord_x = transposed_coords[:, :, :, 0:1]
         transposed_coord_y = transposed_coords[:, :, :, 1:2]
-        transposed_coord_z = transposed_coords[:, :, :, 2:3]       
+        transposed_coord_z = transposed_coords[:, :, :, 2:3]
+
+        if config.GPU_COUNT:
+            transposed_coord_x = transposed_coord_x.cuda()
+            transposed_coord_y = transposed_coord_y.cuda()
+            transposed_coord_z = transposed_coord_z.cuda()
+
     
         if config.GPU_COUNT:
             transposed_coord_x = transposed_coord_x.cuda()
@@ -1354,6 +1362,74 @@ def compute_mrcnn_mask_loss(target_masks, target_class_ids, pred_masks):
 
     return loss
 
+def class_id_to_theta(class_id):
+    def my_func(class_id):
+        target_classes = torch.tensor([1, 2, 4], device=class_id.device)
+        is_in_target = (class_id[..., None] == target_classes).any(-1)
+        result = torch.where(is_in_target, torch.tensor(2 * math.pi / 6, dtype=torch.float32, device=class_id.device), torch.tensor(0, dtype=torch.float32, device=class_id.device))
+        return result
+
+    return my_func(class_id)
+
+
+def rotation_y_matrix(theta):
+    rotation_matrix = torch.stack([torch.cos(theta), torch.tensor(0.0), torch.sin(theta),
+                                    torch.tensor(0.0), torch.tensor(1.0), torch.tensor(0.0),
+                                    -torch.sin(theta), torch.tensor(0.0), torch.cos(theta)])
+    rotation_matrix = rotation_matrix.reshape(3, 3)
+    return rotation_matrix
+
+def gather_nd_torch(params, indices, batch_dims=0):
+    """ The same as tf.gather_nd.
+    indices is an k-dimensional integer tensor, best thought of as a (k-1)-dimensional tensor of indices into params, where each element defines a slice of params:
+
+    output[\\(i_0, ..., i_{k-2}\\)] = params[indices[\\(i_0, ..., i_{k-2}\\)]]
+
+    Args:
+        params (Tensor): "n" dimensions. shape: [x_0, x_1, x_2, ..., x_{n-1}]
+        indices (Tensor): "k" dimensions. shape: [y_0,y_2,...,y_{k-2}, m]. m <= n.
+
+    Returns: gathered Tensor.
+        shape [y_0,y_2,...y_{k-2}] + params.shape[m:] 
+
+    """
+    if isinstance(indices, torch.Tensor):
+      indices = indices.cpu().numpy()
+    else:
+      if not isinstance(indices, np.array):
+        raise ValueError(f'indices must be `torch.Tensor` or `numpy.array`. Got {type(indices)}')
+    if batch_dims == 0:
+        orig_shape = list(indices.shape)
+        num_samples = int(np.prod(orig_shape[:-1]))
+        m = orig_shape[-1]
+        n = len(params.shape)
+
+        if m <= n:
+            out_shape = orig_shape[:-1] + list(params.shape[m:])
+        else:
+            raise ValueError(
+                f'the last dimension of indices must less or equal to the rank of params. Got indices:{indices.shape}, params:{params.shape}. {m} > {n}'
+            )
+        indices = indices.reshape((num_samples, m)).transpose().tolist()
+        output = params[indices]    # (num_samples, ...)
+        return output.reshape(out_shape).contiguous()
+    else:
+        batch_shape = params.shape[:batch_dims]
+        orig_indices_shape = list(indices.shape)
+        orig_params_shape = list(params.shape)
+        assert (
+            batch_shape == indices.shape[:batch_dims]
+        ), f'if batch_dims is not 0, then both "params" and "indices" have batch_dims leading batch dimensions that exactly match.'
+        mbs = np.prod(batch_shape)
+        if batch_dims != 1:
+            params = params.reshape(mbs, *(params.shape[batch_dims:]))
+            indices = indices.reshape(mbs, *(indices.shape[batch_dims:]))
+        output = []
+        for i in range(mbs):
+            output.append(gather_nd_torch(params[i], indices[i], batch_dims=0))
+        output = torch.stack(output, dim=0)
+        output_shape = orig_indices_shape[:-1] + list(orig_params_shape[orig_indices_shape[-1]+batch_dims:])
+        return output.reshape(*output_shape).contiguous()
 
 def mrcnn_coord_bins_symmetry_loss(target_masks, target_coords, target_class_ids, target_domain_labels, pred_coords):
     """Mask L2 loss for the coordinates head.
@@ -1364,6 +1440,10 @@ def mrcnn_coord_bins_symmetry_loss(target_masks, target_coords, target_class_ids
     target_class_ids: [batch, num_rois]. Integer class IDs. Zero padded.
     pred_coords: [batch, proposals, height, width, num_classes, num_bins, 3] float32 tensor with values from 0 to 1.
     """
+    #transforms to match the required input dimentions
+    target_coords=torch.permute(target_coords,(1,2,3,0))
+    pred_coords=torch.permute(pred_coords,(1,4,5,2,3,0))
+    target_masks=torch.unsqueeze(target_masks, 0)
 
     # Reshape for simplicity. Merge first two dimensions into one.
 
@@ -1376,7 +1456,7 @@ def mrcnn_coord_bins_symmetry_loss(target_masks, target_coords, target_class_ids
     target_coords = target_coords.view(-1, mask_shape[2], mask_shape[3], 3)
 
     pred_shape = pred_coords.size()
-    pred_coords_reshape = pred_coords.view(-1, pred_shape[2], pred_shape[3], pred_shape[4], num_bins, 3)
+    pred_coords_reshape = pred_coords.view(-1, pred_shape[1], pred_shape[2], pred_shape[3], num_bins, 3)
     # Permute predicted coords to [N, num_classes, height, width, 3, num_bins]
     pred_coords_trans = pred_coords_reshape.permute(0, 3, 1, 2, 5, 4)
 
@@ -1387,51 +1467,111 @@ def mrcnn_coord_bins_symmetry_loss(target_masks, target_coords, target_class_ids
     domain_ix = torch.eq(target_domain_labels, False)
     target_class_ids = torch.mul(target_class_ids, domain_ix.float())
 
-    positive_ix = torch.nonzero(target_class_ids > 0)[:, 0]
+    #positive_ix = torch.nonzero(target_class_ids > 0)[:, 0]
+    positive_ix = torch.nonzero(target_class_ids > 0, as_tuple=True)[0]
 
 
     def nonzero_positive_loss(target_masks, target_coords, pred_coords_trans, positive_ix):
-        positive_class_ids = torch.tensor(target_class_ids)[positive_ix].to(torch.int64)
+        #positive_class_ids = torch.tensor(target_class_ids)[positive_ix].to(torch.int64)
+        positive_class_ids = target_class_ids[positive_ix].to(torch.int64)
         positive_class_rotation_theta = torch.tensor([class_id_to_theta(x) for x in positive_class_ids], dtype=torch.float32)
 
-        positive_class_rotation_matrix = torch.tensor([rotation_y_matrix(x) for x in positive_class_rotation_theta], dtype=torch.float32).reshape(-1, 3, 3)
-        positive_class_rotation_matrix = positive_class_rotation_matrix.reshape(-1, 1, 1, 3, 3)
+        positive_class_rotation_matrix = torch.stack([rotation_y_matrix(x) for x in positive_class_rotation_theta]).reshape(-1, 3, 3)
+        positive_class_rotation_matrix = positive_class_rotation_matrix.reshape(-1, 1, 1, 3, 3) # [num_pos_rois, 1, 1, 3, 3]
 
         tiled_rotation_matrix = positive_class_rotation_matrix.repeat(1, mask_shape[2], mask_shape[3], 1, 1)
         indices = torch.stack([positive_ix, positive_class_ids], dim=1)
 
+        if indices.is_cuda:
+            tiled_rotation_matrix = tiled_rotation_matrix.cuda()
+
         y_true = target_coords[positive_ix] - 0.5
+
+
         y_true = y_true.unsqueeze(4)
 
+        ## num_rotations = 6
         rotated_y_true_1 = torch.matmul(tiled_rotation_matrix, y_true)
         rotated_y_true_2 = torch.matmul(tiled_rotation_matrix, rotated_y_true_1)
         rotated_y_true_3 = torch.matmul(tiled_rotation_matrix, rotated_y_true_2)
         rotated_y_true_4 = torch.matmul(tiled_rotation_matrix, rotated_y_true_3)
         rotated_y_true_5 = torch.matmul(tiled_rotation_matrix, rotated_y_true_4)
 
+        # Gather the coordinate maps and masks (predicted and true) that contribute to loss
+        # true coord map:[N', height, width, bins]
         y_true_stack = torch.cat([y_true, rotated_y_true_1, rotated_y_true_2, rotated_y_true_3, rotated_y_true_4, rotated_y_true_5], dim=4)
-        y_true_stack = y_true_stack.permute(0, 1, 2, 4, 3)
+
+         ## shape: [num_pos_rois, height, width, 3, 6]
+        y_true_stack = y_true_stack.permute(0, 1, 2, 4, 3)## shape: [num_pos_rois, height, width, 6, 3]
         y_true_stack = y_true_stack + 0.5
 
-        y_true_bins_stack = y_true_stack * num_bins.to(torch.float32) - 0.000001
+
+        y_true_bins_stack = y_true_stack * float(num_bins) - 1e-6
         y_true_bins_stack = torch.floor(y_true_bins_stack)
-        y_true_bins_stack = y_true_bins_stack.to(torch.int32)
-        y_true_bins_stack = torch.nn.functional.one_hot(y_true_bins_stack, num_bins).permute(0, 1, 2, 3, 5, 4)
+        y_true_bins_stack = y_true_bins_stack.to(torch.int64)
 
-        y_pred = pred_coords_trans[indices[0], indices[1]]
-        y_pred = y_pred.unsqueeze(3)
-        y_pred_stack = y_pred.repeat(1, 1, 1, y_true_stack.shape[3], 1, 1)
+        y_true_bins_stack = torch.clamp(y_true_bins_stack, min=0, max=num_bins-1)
+        # y_true_bins_stack = torch.nn.functional.one_hot(y_true_bins_stack, num_classes=num_bins) #check for errors because of clamp
+        #y_true_bins_stack = torch.nn.functional.one_hot(y_true_bins_stack, num_classes=num_bins)
 
-        cross_loss = torch.nn.functional.cross_entropy(y_pred_stack, y_true_bins_stack)
+        # y_true_bins_stack = y_true_stack * num_bins - 0.000001
+        # y_true_bins_stack = torch.floor(y_true_bins_stack)
+        # y_true_bins_stack = y_true_bins_stack.to(torch.int32)
+        # y_true_bins_stack = torch.nn.functional.one_hot(y_true_bins_stack, num_bins).permute(0, 1, 2, 3, 5, 4)
+        # print(indices[0])
+        # print(indices[1])
+        # indices_expanded = indices.unsqueeze(-1).expand(-1, -1, -1, y_true_stack.size(3), pred_coords_trans.size(-1))
+        # y_pred = torch.gather(pred_coords_trans, 4, indices_expanded)
+        # y_pred = y_pred.unsqueeze(3)
+        # y_pred_stack = y_pred.repeat(1, 1, 1, y_true_stack.size(3), 1, 1)
+        # y_pred = pred_coords_trans[indices[0], indices[1]]
+        # y_pred = y_pred.unsqueeze(3)
+        # y_pred_stack = y_pred.repeat(1, 1, 1, y_true_stack.shape[3], 1, 1)
+        # Gather elements from pred_coords_trans using indices
+        # Assuming pred_coords_trans and indices are PyTorch tensors with the given shapes
+        #gather_nd(params, indices)
+        y_pred = gather_nd_torch(pred_coords_trans, indices)
+        y_pred = y_pred.unsqueeze(3)  # shape: [num_pos_roi, height, width, 1, 3, num_bins]
+        # Tile y_pred to match the shape of y_true_stack
+        y_pred_stack = y_pred.repeat(1, 1, 1, y_true_stack.size(3), 1, 1)
 
-        mask = target_masks[positive_ix]
+        # print(y_pred_stack.permute(0,5,1,2,3,4).shape,y_true_bins_stack.argmax(dim=-1).shape)
+
+        cross_loss = torch.nn.functional.cross_entropy(y_pred_stack.permute(0,5,1,2,3,4), y_true_bins_stack,reduction='none') # check the value of this
+
+        # cross_loss = F.nll_loss(y_pred_stack.permute(0,5,1,2,3,4).log(), y_true_bins_stack.argmax(dim=-1))
+
+        # cross_loss = F.nll_loss(y_pred_stack.permute(0,5,1,2,3,4).log(), y_true_bins_stack,reduction='none') # check the value of this
+
+        # mask = target_masks[positive_ix]
+        mask = torch.index_select(target_masks, 0, positive_ix) ## shape: [num_pixels_in_mask, 6, 3]
         reshape_mask = mask.reshape(mask.shape[0], mask.shape[1], mask.shape[2], 1, 1)
 
         num_of_pixels = mask.sum(dim=[1, 2]) + 0.00001
 
         cross_loss_in_mask = cross_loss * reshape_mask
-        sum_loss_in_mask = cross_loss_in_mask.sum(dim=[1, 2, 3, 4]) / num_of_pixels
-        return sum_loss_in_mask.mean()
+        sum_loss_in_mask = cross_loss_in_mask.sum(dim=[1,2])
+        total_sum_loss_in_mask = sum_loss_in_mask.sum(dim=-1)
+
+        arg_min_rotation = torch.argmin(total_sum_loss_in_mask,dim=-1).to(torch.int32)
+
+        min_indices = torch.stack([torch.arange(arg_min_rotation.shape[0],device = arg_min_rotation.device), arg_min_rotation], dim=-1)
+        min_loss_in_mask = gather_nd_torch(sum_loss_in_mask, min_indices)
+
+        mean_loss_in_mask = min_loss_in_mask /  num_of_pixels.unsqueeze(1)
+
+        sym_loss = mean_loss_in_mask.mean(0)
+
+        # min_indices = tf.stack([tf.range(tf.shape(arg_min_rotation)[0]), arg_min_rotation], axis=-1)
+        # min_loss_in_mask = tf.gather_nd(sum_loss_in_mask, min_indices)  ## shape: [num_pos_rois, 3]
+        # mean_loss_in_mask = tf.divide(min_loss_in_mask, tf.expand_dims(num_of_pixels, axis=1))  ## shape: [num_pos_rois, 3]
+        # sym_loss = tf.reduce_mean(mean_loss_in_mask, axis=0)  ## shape:[3]
+
+        # sum_loss_in_mask = cross_loss_in_mask.sum(dim=[1, 2, 3, 4]) / num_of_pixels
+
+        # return sum_loss_in_mask.mean()
+
+        return sym_loss
 
     def zero_positive_loss(target_masks, target_coords, pred_coords_trans, positive_ix):
         return torch.tensor([0.0, 0.0, 0.0])
@@ -2268,13 +2408,18 @@ class MaskRCNN(nn.Module):
                 # Create masks for detections
                 mrcnn_mask = self.mask(mrcnn_feature_maps, rois)
 
+
             #using bins, unshared weights, not using deltas
             #nocs inference
             #self, depth, pool_size, image_shape, num_classes
             #self,depth, pool_size,image_shape, num_classes, num_bins, net_name
-            mrcnn_coord_x_bin, mrcnn_coord_x_feature = self.nocs_head_x(mrcnn_feature_maps, gt_boxes)
-            mrcnn_coord_y_bin, mrcnn_coord_y_feature = self.nocs_head_y(mrcnn_feature_maps, gt_boxes )
-            mrcnn_coord_z_bin, mrcnn_coord_z_feature = self.nocs_head_z(mrcnn_feature_maps, gt_boxes)
+            # mrcnn_coord_x_bin, mrcnn_coord_x_feature = self.nocs_head_x(mrcnn_feature_maps, gt_boxes)
+            # mrcnn_coord_y_bin, mrcnn_coord_y_feature = self.nocs_head_y(mrcnn_feature_maps, gt_boxes )
+            # mrcnn_coord_z_bin, mrcnn_coord_z_feature = self.nocs_head_z(mrcnn_feature_maps, gt_boxes)
+
+            mrcnn_coord_x_bin, mrcnn_coord_x_feature = self.nocs_head_x(mrcnn_feature_maps, rois.unsqueeze(0))
+            mrcnn_coord_y_bin, mrcnn_coord_y_feature = self.nocs_head_y(mrcnn_feature_maps, rois.unsqueeze(0))
+            mrcnn_coord_z_bin, mrcnn_coord_z_feature = self.nocs_head_z(mrcnn_feature_maps, rois.unsqueeze(0))
 
             coord_bin_values_module = CoordBinValues(self.config.NUM_BINS)
             mrcnn_coord_x_bin_value = coord_bin_values_module(mrcnn_coord_x_bin)
@@ -2286,8 +2431,9 @@ class MaskRCNN(nn.Module):
             mrcnn_coord_z_bin_value = mrcnn_coord_z_bin_value.unsqueeze(0)
 
             pred_coords = [mrcnn_coord_x_bin_value,mrcnn_coord_y_bin_value,mrcnn_coord_z_bin_value]
+            mrcnn_coords_bin=torch.stack((mrcnn_coord_x_bin,mrcnn_coord_y_bin,mrcnn_coord_z_bin))
 
-            return [rpn_class_logits, rpn_bbox, target_class_ids, mrcnn_class_logits, target_deltas,target_coords,mrcnn_bbox, target_mask, mrcnn_mask, pred_coords]
+            return [rpn_class_logits, rpn_bbox, target_class_ids, mrcnn_class_logits, target_deltas,target_coords,mrcnn_bbox, target_mask, mrcnn_mask, pred_coords,mrcnn_coords_bin]
 
     def train_model(self, train_dataset, val_dataset, learning_rate, epochs, layers):
         """Train the model.
@@ -2373,7 +2519,9 @@ class MaskRCNN(nn.Module):
         loss_mrcnn_class_sum = 0
         loss_mrcnn_bbox_sum = 0
         loss_mrcnn_mask_sum = 0
-        loss_coord_sum = 0
+        loss_x_coord_sum = 0
+        loss_y_coord_sum = 0
+        loss_z_coord_sum = 0
         step = 0
 
         optimizer.zero_grad()
@@ -2390,6 +2538,15 @@ class MaskRCNN(nn.Module):
             gt_masks = inputs[6]
             gt_coords = inputs[7]
             gt_domain_label = inputs[8]
+
+            plt.figure()
+            plt.subplot(1,3,1)
+            plt.imshow(images[0].permute(1,2,0))
+            plt.subplot(1,3,2)
+            plt.imshow(gt_masks[0].permute(1,2,0).sum(2))
+            plt.subplot(1,3,3)
+            plt.imshow(gt_coords[0].sum(2))
+            plt.savefig('output_images/myfig2.png')
 
             if rpn_bbox.sum() == 0:
                 batch_count -= 1
@@ -2417,26 +2574,24 @@ class MaskRCNN(nn.Module):
                 gt_masks = gt_masks.cuda()
 
             # Run object detection
-            rpn_class_logits, rpn_pred_bbox, target_class_ids, mrcnn_class_logits, target_deltas,target_coords,mrcnn_bbox, target_mask, mrcnn_mask, pred_coords = \
+            rpn_class_logits, rpn_pred_bbox, target_class_ids, mrcnn_class_logits, target_deltas,target_coords,mrcnn_bbox, target_mask, mrcnn_mask, pred_coords,mrcnn_coords_bin = \
                 self.predict([images, image_metas, gt_class_ids, gt_boxes, gt_masks,gt_coords,gt_domain_label], mode='training')
             
-            print(gt_domain_label.shape,target_class_ids.shape)
+            # print(gt_domain_label.shape,target_class_ids.shape)
             target_domain_labels = torch.tile(gt_domain_label, (1, target_class_ids.shape[0]))
 
-            ########### Calculating and calling symmetric los here ############################
-            mrcnn_coord_x_bin_value=pred_coords[0]
-            mrcnn_coord_y_bin_value=pred_coords[1]
-            mrcnn_coord_z_bin_value=pred_coords[2]
+            if self.config.GPU_COUNT:
+                target_domain_labels = target_domain_labels.cuda() 
 
-            # mrcnn_coords_bin = torch.stack([mrcnn_coord_x_bin_value, mrcnn_coord_y_bin_value, mrcnn_coord_z_bin_value], dim=-1)
-            # coord_bin_loss = mrcnn_coord_bins_symmetry_loss(target_mask, target_coords, target_class_ids, target_domain_labels, mrcnn_coords_bin)
-            # coord_x_bin_loss = coord_bin_loss[0].reshape(1, 1)
-            # coord_y_bin_loss = coord_bin_loss[1].reshape(1, 1)
-            # coord_z_bin_loss = coord_bin_loss[2].reshape(1, 1)
+            ########### Calculating and calling symmetric los here ############################
+            coord_bin_loss = mrcnn_coord_bins_symmetry_loss(target_mask, target_coords, target_class_ids, target_domain_labels, mrcnn_coords_bin)
+            coord_x_bin_loss = coord_bin_loss[0]
+            coord_y_bin_loss = coord_bin_loss[1]
+            coord_z_bin_loss = coord_bin_loss[2]
             # print(mrcnn_coords_bin)
             # Compute losses
             rpn_class_loss, rpn_bbox_loss, mrcnn_class_loss, mrcnn_bbox_loss, mrcnn_mask_loss = compute_losses(rpn_match, rpn_bbox, rpn_class_logits, rpn_pred_bbox, target_class_ids, mrcnn_class_logits, target_deltas, mrcnn_bbox, target_mask, mrcnn_mask, pred_coords)
-            loss = rpn_class_loss + rpn_bbox_loss + mrcnn_class_loss + mrcnn_bbox_loss + mrcnn_mask_loss
+            loss = rpn_class_loss + rpn_bbox_loss + mrcnn_class_loss + mrcnn_bbox_loss + mrcnn_mask_loss + coord_x_bin_loss + coord_y_bin_loss + coord_z_bin_loss
 
             # Backpropagation
             loss.backward()
@@ -2448,10 +2603,10 @@ class MaskRCNN(nn.Module):
 
             # Progress
             printProgressBar(step + 1, steps, prefix="\t{}/{}".format(step + 1, steps),
-                             suffix="Complete - loss: {:.5f} - rpn_class_loss: {:.5f} - rpn_bbox_loss: {:.5f} - mrcnn_class_loss: {:.5f} - mrcnn_bbox_loss: {:.5f} - mrcnn_mask_loss: {:.5f}".format(
+                             suffix="Complete - loss: {:.5f} - rpn_class_loss: {:.5f} - rpn_bbox_loss: {:.5f} - mrcnn_class_loss: {:.5f} - mrcnn_bbox_loss: {:.5f} - mrcnn_mask_loss: {:.5f} - coord_x_bin_loss: {:.5f} - coord_y_bin_loss: {:.5f} - coord_z_bin_loss: {:.5f}".format(
                                  loss.item(), rpn_class_loss.item(), rpn_bbox_loss.item(),
                                  mrcnn_class_loss.item(), mrcnn_bbox_loss.item(),
-                                 mrcnn_mask_loss.item()), length=10)
+                                 mrcnn_mask_loss.item(),coord_x_bin_loss.item(),coord_y_bin_loss.item(),coord_z_bin_loss.item()), length=10)
 
             # Statistics
             loss_sum += loss.item()/steps
@@ -2460,13 +2615,16 @@ class MaskRCNN(nn.Module):
             loss_mrcnn_class_sum += mrcnn_class_loss.item()/steps
             loss_mrcnn_bbox_sum += mrcnn_bbox_loss.item()/steps
             loss_mrcnn_mask_sum += mrcnn_mask_loss.item()/steps
+            loss_x_coord_sum += coord_x_bin_loss.item()/steps
+            loss_y_coord_sum += coord_y_bin_loss.item()/steps
+            loss_z_coord_sum += coord_z_bin_loss.item()/steps
 
             # Break after 'steps' steps
             if step==steps-1:
                 break
             step += 1
 
-        return loss_sum, loss_rpn_class_sum, loss_rpn_bbox_sum, loss_mrcnn_class_sum, loss_mrcnn_bbox_sum, loss_mrcnn_mask_sum
+        return loss_sum, loss_rpn_class_sum, loss_rpn_bbox_sum, loss_mrcnn_class_sum, loss_mrcnn_bbox_sum, loss_mrcnn_mask_sum, loss_x_coord_sum, loss_y_coord_sum, loss_z_coord_sum
 
     def valid_epoch(self, datagenerator, steps):
 
