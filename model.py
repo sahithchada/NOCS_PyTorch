@@ -1361,19 +1361,57 @@ def rotation_y_matrix(theta):
     rotation_matrix = rotation_matrix.reshape(3, 3)
     return rotation_matrix
 
-def gather_nd_torch(pred_coords_trans, indices):
-    # First, get unique batch indices to avoid unnecessary repetitions
-    unique_batch_indices = torch.unique(indices[:, 0])
+def gather_nd_torch(params, indices, batch_dims=0):
+    """ The same as tf.gather_nd.
+    indices is an k-dimensional integer tensor, best thought of as a (k-1)-dimensional tensor of indices into params, where each element defines a slice of params:
 
-    # Gather the elements from pred_coords_trans using the indices
-    y_pred_list = []
-    for batch_idx in unique_batch_indices:
-        batch_indices = indices[indices[:, 0] == batch_idx][:, 1]
-        y_pred_list.append(torch.index_select(pred_coords_trans[batch_idx], 0, batch_indices))
+    output[\\(i_0, ..., i_{k-2}\\)] = params[indices[\\(i_0, ..., i_{k-2}\\)]]
 
-    # Stack the results along the last dimension
-    y_pred = torch.stack(y_pred_list, dim=-1)
-    return y_pred
+    Args:
+        params (Tensor): "n" dimensions. shape: [x_0, x_1, x_2, ..., x_{n-1}]
+        indices (Tensor): "k" dimensions. shape: [y_0,y_2,...,y_{k-2}, m]. m <= n.
+
+    Returns: gathered Tensor.
+        shape [y_0,y_2,...y_{k-2}] + params.shape[m:] 
+
+    """
+    if isinstance(indices, torch.Tensor):
+      indices = indices.numpy()
+    else:
+      if not isinstance(indices, np.array):
+        raise ValueError(f'indices must be `torch.Tensor` or `numpy.array`. Got {type(indices)}')
+    if batch_dims == 0:
+        orig_shape = list(indices.shape)
+        num_samples = int(np.prod(orig_shape[:-1]))
+        m = orig_shape[-1]
+        n = len(params.shape)
+
+        if m <= n:
+            out_shape = orig_shape[:-1] + list(params.shape[m:])
+        else:
+            raise ValueError(
+                f'the last dimension of indices must less or equal to the rank of params. Got indices:{indices.shape}, params:{params.shape}. {m} > {n}'
+            )
+        indices = indices.reshape((num_samples, m)).transpose().tolist()
+        output = params[indices]    # (num_samples, ...)
+        return output.reshape(out_shape).contiguous()
+    else:
+        batch_shape = params.shape[:batch_dims]
+        orig_indices_shape = list(indices.shape)
+        orig_params_shape = list(params.shape)
+        assert (
+            batch_shape == indices.shape[:batch_dims]
+        ), f'if batch_dims is not 0, then both "params" and "indices" have batch_dims leading batch dimensions that exactly match.'
+        mbs = np.prod(batch_shape)
+        if batch_dims != 1:
+            params = params.reshape(mbs, *(params.shape[batch_dims:]))
+            indices = indices.reshape(mbs, *(indices.shape[batch_dims:]))
+        output = []
+        for i in range(mbs):
+            output.append(gather_nd(params[i], indices[i], batch_dims=0))
+        output = torch.stack(output, dim=0)
+        output_shape = orig_indices_shape[:-1] + list(orig_params_shape[orig_indices_shape[-1]+batch_dims:])
+        return output.reshape(*output_shape).contiguous()
 
 def mrcnn_coord_bins_symmetry_loss(target_masks, target_coords, target_class_ids, target_domain_labels, pred_coords):
     """Mask L2 loss for the coordinates head.
@@ -1452,7 +1490,7 @@ def mrcnn_coord_bins_symmetry_loss(target_masks, target_coords, target_class_ids
         y_true_bins_stack = y_true_bins_stack.to(torch.int64)
 
         y_true_bins_stack = torch.clamp(y_true_bins_stack, min=0, max=num_bins-1)
-        y_true_bins_stack = torch.nn.functional.one_hot(y_true_bins_stack, num_classes=num_bins) #check for errors because of clamp
+        # y_true_bins_stack = torch.nn.functional.one_hot(y_true_bins_stack, num_classes=num_bins) #check for errors because of clamp
         #y_true_bins_stack = torch.nn.functional.one_hot(y_true_bins_stack, num_classes=num_bins)
 
         # y_true_bins_stack = y_true_stack * num_bins - 0.000001
@@ -1476,7 +1514,13 @@ def mrcnn_coord_bins_symmetry_loss(target_masks, target_coords, target_class_ids
         # Tile y_pred to match the shape of y_true_stack
         y_pred_stack = y_pred.repeat(1, 1, 1, y_true_stack.size(3), 1, 1)
 
-        cross_loss = torch.nn.functional.cross_entropy(y_pred_stack, y_true_bins_stack)
+        print(y_pred_stack.permute(0,5,1,2,3,4).shape,y_true_bins_stack.argmax(dim=-1).shape)
+
+        # cross_loss = torch.nn.functional.cross_entropy(y_pred_stack.permute(0,5,1,2,3,4), y_true_bins_stack.argmax(dim=-1))
+
+        # cross_loss = F.nll_loss(y_pred_stack.permute(0,5,1,2,3,4).log(), y_true_bins_stack.argmax(dim=-1))
+
+        cross_loss = F.nll_loss(y_pred_stack.permute(0,5,1,2,3,4).log(), y_true_bins_stack,reduction='none') # check the value of this
 
         mask = target_masks[positive_ix]
         reshape_mask = mask.reshape(mask.shape[0], mask.shape[1], mask.shape[2], 1, 1)
@@ -1484,7 +1528,25 @@ def mrcnn_coord_bins_symmetry_loss(target_masks, target_coords, target_class_ids
         num_of_pixels = mask.sum(dim=[1, 2]) + 0.00001
 
         cross_loss_in_mask = cross_loss * reshape_mask
-        sum_loss_in_mask = cross_loss_in_mask.sum(dim=[1, 2, 3, 4]) / num_of_pixels
+        sum_loss_in_mask = cross_loss_in_mask.sum(dim=[1,2])
+        total_sum_loss_in_mask = sum_loss_in_mask.sum(dim=-1)
+
+        arg_min_rotation = torch.argmin(total_sum_loss_in_mask,dim=-1).to(torch.int32)
+
+        min_indices = torch.stack([torch.arange(arg_min_rotation.shape[0]), arg_min_rotation], dim=-1)
+        min_loss_in_mask = gather_nd_torch(sum_loss_in_mask, min_indices)
+
+        mean_loss_in_mask = min_loss_in_mask /  num_of_pixels.unsqueeze(1)
+
+        sym_loss = mean_loss_in_mask.mean(0)
+
+        # min_indices = tf.stack([tf.range(tf.shape(arg_min_rotation)[0]), arg_min_rotation], axis=-1)
+        # min_loss_in_mask = tf.gather_nd(sum_loss_in_mask, min_indices)  ## shape: [num_pos_rois, 3]
+        # mean_loss_in_mask = tf.divide(min_loss_in_mask, tf.expand_dims(num_of_pixels, axis=1))  ## shape: [num_pos_rois, 3]
+        # sym_loss = tf.reduce_mean(mean_loss_in_mask, axis=0)  ## shape:[3]
+
+        # sum_loss_in_mask = cross_loss_in_mask.sum(dim=[1, 2, 3, 4]) / num_of_pixels
+
         return sum_loss_in_mask.mean()
 
     def zero_positive_loss(target_masks, target_coords, pred_coords_trans, positive_ix):
@@ -2321,13 +2383,18 @@ class MaskRCNN(nn.Module):
                 # Create masks for detections
                 mrcnn_mask = self.mask(mrcnn_feature_maps, rois)
 
+
             #using bins, unshared weights, not using deltas
             #nocs inference
             #self, depth, pool_size, image_shape, num_classes
             #self,depth, pool_size,image_shape, num_classes, num_bins, net_name
-            mrcnn_coord_x_bin, mrcnn_coord_x_feature = self.nocs_head_x(mrcnn_feature_maps, gt_boxes)
-            mrcnn_coord_y_bin, mrcnn_coord_y_feature = self.nocs_head_y(mrcnn_feature_maps, gt_boxes )
-            mrcnn_coord_z_bin, mrcnn_coord_z_feature = self.nocs_head_z(mrcnn_feature_maps, gt_boxes)
+            # mrcnn_coord_x_bin, mrcnn_coord_x_feature = self.nocs_head_x(mrcnn_feature_maps, gt_boxes)
+            # mrcnn_coord_y_bin, mrcnn_coord_y_feature = self.nocs_head_y(mrcnn_feature_maps, gt_boxes )
+            # mrcnn_coord_z_bin, mrcnn_coord_z_feature = self.nocs_head_z(mrcnn_feature_maps, gt_boxes)
+
+            mrcnn_coord_x_bin, mrcnn_coord_x_feature = self.nocs_head_x(mrcnn_feature_maps, rois.unsqueeze(0))
+            mrcnn_coord_y_bin, mrcnn_coord_y_feature = self.nocs_head_y(mrcnn_feature_maps, rois.unsqueeze(0))
+            mrcnn_coord_z_bin, mrcnn_coord_z_feature = self.nocs_head_z(mrcnn_feature_maps, rois.unsqueeze(0))
 
             coord_bin_values_module = CoordBinValues(self.config.NUM_BINS)
             mrcnn_coord_x_bin_value = coord_bin_values_module(mrcnn_coord_x_bin)
@@ -2444,6 +2511,15 @@ class MaskRCNN(nn.Module):
             gt_masks = inputs[6]
             gt_coords = inputs[7]
             gt_domain_label = inputs[8]
+
+            plt.figure()
+            plt.subplot(1,3,1)
+            plt.imshow(images[0].permute(1,2,0))
+            plt.subplot(1,3,2)
+            plt.imshow(gt_masks[0].permute(1,2,0).sum(2))
+            plt.subplot(1,3,3)
+            plt.imshow(gt_coords[0].sum(2))
+            plt.savefig('output_images/myfig2.png')
 
             # image_metas as numpy array
             image_metas = image_metas.numpy()
