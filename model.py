@@ -2585,7 +2585,7 @@ class MaskRCNN(nn.Module):
             coord_y_bin_loss = coord_bin_loss[1]
             coord_z_bin_loss = coord_bin_loss[2]
             # print(mrcnn_coords_bin)
-            loss = rpn_class_loss + rpn_bbox_loss + mrcnn_class_loss + mrcnn_bbox_loss + mrcnn_mask_loss+coord_x_bin_loss+coord_y_bin_loss+coord_z_bin_loss + coord_x_bin_loss + coord_y_bin_loss + coord_z_bin_loss
+            loss = rpn_class_loss + rpn_bbox_loss + mrcnn_class_loss + mrcnn_bbox_loss + mrcnn_mask_loss+coord_x_bin_loss+coord_y_bin_loss+coord_z_bin_loss 
 
             # Backpropagation
             loss.backward()
@@ -2597,10 +2597,10 @@ class MaskRCNN(nn.Module):
 
             # Progress
             printProgressBar(step + 1, steps, prefix="\t{}/{}".format(step + 1, steps),
-                             suffix="Complete - loss: {:.5f} - rpn_class_loss: {:.5f} - rpn_bbox_loss: {:.5f} - mrcnn_class_loss: {:.5f} - mrcnn_bbox_loss: {:.5f} - mrcnn_mask_loss: {:.5f} - coord_x_bin_loss: {:.5f} - coord_y_bin_loss: {:.5f} - coord_z_bin_loss: {:.5f} - coord_x_bin_loss: {:.5f} - coord_y_bin_loss: {:.5f} - coord_z_bin_loss: {:.5f}".format(
+                             suffix="Complete - loss: {:.5f} - rpn_class_loss: {:.5f} - rpn_bbox_loss: {:.5f} - mrcnn_class_loss: {:.5f} - mrcnn_bbox_loss: {:.5f} - mrcnn_mask_loss: {:.5f} - coord_x_bin_loss: {:.5f} - coord_y_bin_loss: {:.5f} - coord_z_bin_loss: {:.5f}".format(
                                  loss.item(), rpn_class_loss.item(), rpn_bbox_loss.item(),
                                  mrcnn_class_loss.item(), mrcnn_bbox_loss.item(),
-                                 mrcnn_mask_loss.item(),coord_x_bin_loss.item(),coord_y_bin_loss.item(),coord_z_bin_loss.item(),coord_x_bin_loss.item(),coord_y_bin_loss.item(),coord_z_bin_loss.item()), length=10)
+                                 mrcnn_mask_loss.item(),coord_x_bin_loss.item(),coord_y_bin_loss.item(),coord_z_bin_loss.item()), length=10)
 
             # Statistics
             loss_sum += loss.item()/steps
