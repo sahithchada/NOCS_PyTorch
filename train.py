@@ -65,7 +65,7 @@ class CocoConfig(Config):
 class Nocs_train_config(Config):
     # config file for nocs training, derives from base config  
     NAME="NOCS_train"
-    GPU_COUNT = 0
+    GPU_COUNT = 1
     IMAGES_PER_GPU = 1
 
     # Number of classes (including background)
