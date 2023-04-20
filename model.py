@@ -2406,11 +2406,28 @@ class MaskRCNN(nn.Module):
                 mrcnn_class = Variable(torch.IntTensor())
                 mrcnn_bbox = Variable(torch.FloatTensor())
                 mrcnn_mask = Variable(torch.FloatTensor())
+
+                mrcnn_coord_x_bin = torch.FloatTensor()
+                mrcnn_coord_y_bin = torch.FloatTensor()
+                mrcnn_coord_z_bin = torch.FloatTensor()
+
+                mrcnn_coord_x_bin_value = torch.FloatTensor()
+                mrcnn_coord_y_bin_value = torch.FloatTensor()
+                mrcnn_coord_z_bin_value = torch.FloatTensor()
+
+
                 if self.config.GPU_COUNT:
                     mrcnn_class_logits = mrcnn_class_logits.cuda()
                     mrcnn_class = mrcnn_class.cuda()
                     mrcnn_bbox = mrcnn_bbox.cuda()
                     mrcnn_mask = mrcnn_mask.cuda()
+                    mrcnn_coord_x_bin = mrcnn_coord_x_bin.cuda()
+                    mrcnn_coord_y_bin = mrcnn_coord_y_bin.cuda()
+                    mrcnn_coord_z_bin = mrcnn_coord_z_bin.cuda()
+                    mrcnn_coord_x_bin_value = mrcnn_coord_x_bin_value.cuda()
+                    mrcnn_coord_y_bin_value = mrcnn_coord_x_bin_value.cuda()
+                    mrcnn_coord_z_bin_value = mrcnn_coord_x_bin_value.cuda()
+
             else:
                 # Network Heads
                 # Proposal classifier and BBox regressor heads
@@ -2419,27 +2436,18 @@ class MaskRCNN(nn.Module):
                 # Create masks for detections
                 mrcnn_mask = self.mask(mrcnn_feature_maps, rois)
 
+                mrcnn_coord_x_bin, mrcnn_coord_x_feature = self.nocs_head_x(mrcnn_feature_maps, rois.unsqueeze(0))
+                mrcnn_coord_y_bin, mrcnn_coord_y_feature = self.nocs_head_y(mrcnn_feature_maps, rois.unsqueeze(0))
+                mrcnn_coord_z_bin, mrcnn_coord_z_feature = self.nocs_head_z(mrcnn_feature_maps, rois.unsqueeze(0))
 
-            #using bins, unshared weights, not using deltas
-            #nocs inference
-            #self, depth, pool_size, image_shape, num_classes
-            #self,depth, pool_size,image_shape, num_classes, num_bins, net_name
-            # mrcnn_coord_x_bin, mrcnn_coord_x_feature = self.nocs_head_x(mrcnn_feature_maps, gt_boxes)
-            # mrcnn_coord_y_bin, mrcnn_coord_y_feature = self.nocs_head_y(mrcnn_feature_maps, gt_boxes )
-            # mrcnn_coord_z_bin, mrcnn_coord_z_feature = self.nocs_head_z(mrcnn_feature_maps, gt_boxes)
+                coord_bin_values_module = CoordBinValues(self.config.NUM_BINS)
+                mrcnn_coord_x_bin_value = coord_bin_values_module(mrcnn_coord_x_bin)
+                mrcnn_coord_y_bin_value = coord_bin_values_module(mrcnn_coord_y_bin)
+                mrcnn_coord_z_bin_value = coord_bin_values_module(mrcnn_coord_z_bin)
 
-            mrcnn_coord_x_bin, mrcnn_coord_x_feature = self.nocs_head_x(mrcnn_feature_maps, rois.unsqueeze(0))
-            mrcnn_coord_y_bin, mrcnn_coord_y_feature = self.nocs_head_y(mrcnn_feature_maps, rois.unsqueeze(0))
-            mrcnn_coord_z_bin, mrcnn_coord_z_feature = self.nocs_head_z(mrcnn_feature_maps, rois.unsqueeze(0))
-
-            coord_bin_values_module = CoordBinValues(self.config.NUM_BINS)
-            mrcnn_coord_x_bin_value = coord_bin_values_module(mrcnn_coord_x_bin)
-            mrcnn_coord_y_bin_value = coord_bin_values_module(mrcnn_coord_y_bin)
-            mrcnn_coord_z_bin_value = coord_bin_values_module(mrcnn_coord_z_bin)
-
-            mrcnn_coord_x_bin_value = mrcnn_coord_x_bin_value.unsqueeze(0)
-            mrcnn_coord_y_bin_value = mrcnn_coord_y_bin_value.unsqueeze(0)
-            mrcnn_coord_z_bin_value = mrcnn_coord_z_bin_value.unsqueeze(0)
+                mrcnn_coord_x_bin_value = mrcnn_coord_x_bin_value.unsqueeze(0)
+                mrcnn_coord_y_bin_value = mrcnn_coord_y_bin_value.unsqueeze(0)
+                mrcnn_coord_z_bin_value = mrcnn_coord_z_bin_value.unsqueeze(0)
 
             pred_coords = [mrcnn_coord_x_bin_value,mrcnn_coord_y_bin_value,mrcnn_coord_z_bin_value]
             mrcnn_coords_bin=torch.stack((mrcnn_coord_x_bin,mrcnn_coord_y_bin,mrcnn_coord_z_bin))
