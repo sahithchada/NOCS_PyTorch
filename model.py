@@ -761,9 +761,36 @@ def detection_target_layer(proposals, gt_class_ids, gt_boxes, gt_masks,gt_coords
 
         masks_reshaped = roi_masks.unsqueeze(1)
 
-        boxes_and_ids = torch.cat((box_ids.view(-1, 1 ),level_boxes), dim=1)  # Concatenate boxes and box_ids
+        boxes_and_ids = torch.cat((box_ids.view(-1, 1),level_boxes), dim=1)  # Concatenate boxes and box_ids
+        # boxes_and_ids = torch.cat((indexes,level_boxes), dim=1)
         #masks_reshaped = torch.reshape(feature_maps[i], (1,n, h,w))
         masks = roi_align(masks_reshaped,boxes_and_ids, output_size=(config.MASK_SHAPE[0], config.MASK_SHAPE[1]), spatial_scale=masks_reshaped.shape[-1])
+
+        # image_vis = np.zeros((600,600,3))
+        # full_res = np.zeros((600,600))
+
+        # for i in range(masks.shape[0]):
+        
+        #     mask = masks[i,0]
+        #     bbox = level_boxes[i] * 600
+
+        #     full_mask = utils.unmold_mask(mask.detach().cpu().numpy(), bbox.detach().cpu().numpy().astype(np.uint8), full_res.shape)
+
+        #     full_res += full_mask
+        
+        # plt.figure()
+        # plt.imshow(full_res)
+        # plt.savefig('output_images/hello.png')
+
+        # visualize.display_instances(image_vis, level_boxes.detach().cpu().numpy(), masks[:,0,:,:].permute(1,2,0).detach().cpu().numpy(), box_ids.detach().cpu().numpy(), ['BG', #0
+        #             'bottle', #1
+        #             'bowl', #2
+        #             'camera', #3
+        #             'can',  #4
+        #             'laptop',#5
+        #             'mug'#6
+        #             ], 'hi_01' , scores=None,title="", figsize=(16, 16), ax=None)
+
         masks = Variable(masks.data, requires_grad=False)
         masks = masks.squeeze(1)
 
@@ -1578,10 +1605,6 @@ def compute_mrcnn_coord_bins_symmetry_loss(target_masks, target_coords, target_c
         # sym_loss = tf.reduce_mean(mean_loss_in_mask, axis=0)  ## shape:[3]
 
         # sum_loss_in_mask = cross_loss_in_mask.sum(dim=[1, 2, 3, 4]) / num_of_pixels
-        return sym_loss
-
-        # return sum_loss_in_mask.mean()
-
         return sym_loss
 
     def zero_positive_loss(target_masks, target_coords, pred_coords_trans, positive_ix):

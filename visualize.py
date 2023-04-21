@@ -124,7 +124,7 @@ def display_instances(image, boxes, masks, class_ids, class_names, fl_name,
         class_id = class_ids[i]
         score = scores[i] if scores is not None else None
         label = class_names[class_id]
-        x = random.randint(x1, (x1 + x2) // 2)
+        # x = random.randint(x1, (x1 + x2) // 2)
         caption = "{} {:.3f}".format(label, score) if score else label
         ax.text(x1, y1 + 8, caption,
                 color='w', size=11, backgroundcolor="none")
