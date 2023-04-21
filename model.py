@@ -675,12 +675,6 @@ def detection_target_layer(proposals, gt_class_ids, gt_boxes, gt_masks,gt_coords
             transposed_coord_y = transposed_coord_y.cuda()
             transposed_coord_z = transposed_coord_z.cuda()
 
-    
-        if config.GPU_COUNT:
-            transposed_coord_x = transposed_coord_x.cuda()
-            transposed_coord_y = transposed_coord_y.cuda()
-            transposed_coord_z = transposed_coord_z.cuda()
-
         
         roi_coord_x = transposed_coord_x[roi_gt_box_assignment]
         roi_coord_y = transposed_coord_y[roi_gt_box_assignment]
@@ -798,19 +792,19 @@ def detection_target_layer(proposals, gt_class_ids, gt_boxes, gt_masks,gt_coords
         # binary cross entropy loss.
         masks = torch.round(masks)
 
-        roi_coord_x = roi_coord_x.unsqueeze(1)
-        roi_coord_x = roi_align(roi_coord_x, boxes_and_ids, output_size=(config.COORD_SHAPE[0], config.COORD_SHAPE[1]), spatial_scale=roi_coord_x.shape[-2])
+        roi_coord_x = torch.permute(roi_coord_x,(0,3,1,2))
+        roi_coord_x = roi_align(roi_coord_x, boxes_and_ids, output_size=(config.COORD_SHAPE[0], config.COORD_SHAPE[1]), spatial_scale=roi_coord_x.shape[-1])
         roi_coord_x = Variable(roi_coord_x.data, requires_grad=False)
         coord_x = roi_coord_x.squeeze(1)
 
 
-        roi_coord_y = roi_coord_y.unsqueeze(1)
-        roi_coord_y = roi_align(roi_coord_y, boxes_and_ids, output_size=(config.COORD_SHAPE[0], config.COORD_SHAPE[1]), spatial_scale=roi_coord_z.shape[-2])
+        roi_coord_y = torch.permute(roi_coord_y,(0,3,1,2))
+        roi_coord_y = roi_align(roi_coord_y, boxes_and_ids, output_size=(config.COORD_SHAPE[0], config.COORD_SHAPE[1]), spatial_scale=roi_coord_z.shape[-1])
         roi_coord_y = Variable(roi_coord_y.data, requires_grad=False)
         coord_y = roi_coord_y.squeeze(1)
 
-        roi_coord_z = roi_coord_z.unsqueeze(1)
-        roi_coord_z = roi_align(roi_coord_z, boxes_and_ids, output_size=(config.COORD_SHAPE[0], config.COORD_SHAPE[1]), spatial_scale=roi_coord_z.shape[-2])
+        roi_coord_z = torch.permute(roi_coord_z,(0,3,1,2))
+        roi_coord_z = roi_align(roi_coord_z, boxes_and_ids, output_size=(config.COORD_SHAPE[0], config.COORD_SHAPE[1]), spatial_scale=roi_coord_z.shape[-1])
         roi_coord_z = Variable(roi_coord_z.data, requires_grad=False)
         coord_z = roi_coord_z.squeeze(1)
 
@@ -2597,7 +2591,6 @@ class MaskRCNN(nn.Module):
 
             if rpn_bbox.sum() == 0:
                 batch_count -= 1
-                print('HI')
                 continue
 
             # plt.figure()
