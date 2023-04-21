@@ -27,7 +27,7 @@ MODEL_DIR = os.path.join(ROOT_DIR, "logs")
 # project (See README file for details)
 
 COCO_MODEL_PATH = os.path.join(ROOT_DIR, "models/mask_rcnn_coco.pth")
-TRAINED_PATH = 'models/nocs_train20230420T1816/mask_rcnn_nocs_train_0001.pth'
+TRAINED_PATH = 'models/nocs_train20230420T2101/mask_rcnn_nocs_train_0050.pth'
 
 # Directory of images to run detection on
 IMAGE_DIR = os.path.join(ROOT_DIR, "images")
@@ -90,21 +90,80 @@ for coco_cls in class_map:
     coco_cls_ids.append(ind)
 config.display()
 
-# Create an instance of your PyTorch MaskRCNN model with the given configuration
-model = modellib.MaskRCNN(config=config, model_dir=MODEL_DIR)
+def model_with_weights(mode = 'Trained'):
 
-model.load_state_dict(torch.load(TRAINED_PATH))
+    model = modellib.MaskRCNN(config=config, model_dir=MODEL_DIR)
+
+    if mode == 'Trained':
+        model.load_state_dict(torch.load(TRAINED_PATH))
+    
+    elif mode == 'COCO':
+
+        pretrained_state_dict = torch.load(COCO_MODEL_PATH)
+
+        filtered_state_dict = pretrained_state_dict
+
+        mismatches = ["classifier.linear_class.weight","classifier.linear_class.bias","classifier.linear_bbox.weight","classifier.linear_bbox.bias","mask.conv5.weight","mask.conv5.bias"]
+
+        for i in range(len(mismatches)):
+
+            weights = filtered_state_dict[mismatches[i]]
+
+            if weights.shape[0] == 81 and weights.dim() > 1:
+                w1 = weights[[0,40,46]]
+                w2 = weights[[64,42]]
+                w3 = torch.zeros_like(w2)
+
+                final_weights = torch.vstack((w1,w3,w2))
+                pass
+
+            # weights shape = (324,1024)
+            # expected 28,1024
+            # 0:3, 160:163, 184:187, 256:259, 168:171
+            elif weights.shape[0] == 324 and len(weights.shape) > 1:
+                weights = torch.reshape(weights, (81,4,1024))
+                # weights = weights.view(weights.size()[0], -1, 4)
+                w1 = weights[[0,40,46]]
+                w2 = weights[[64,42]]
+                w3 = torch.zeros_like(w2)
+
+                final_weights = torch.vstack((w1.flatten(end_dim=-2),w3.flatten(end_dim=-2),w2.flatten(end_dim=-2)))
+
+            elif weights.shape[0] == 324:
+                weights = torch.reshape(weights, (81,4))
+                w1 = weights[[0,40,46]]
+                w2 = weights[[64,42]]
+                w3 = torch.zeros_like(w2)
+
+                final_weights = torch.cat((w1.flatten(),w3.flatten(),w2.flatten()))
+            else:
+                w1 = weights[[0,40,46]]
+                w2 = weights[[64,42]]
+                w3 = torch.zeros_like(w2)
+
+                final_weights = torch.cat((w1,w3,w2))
+
+            filtered_state_dict[mismatches[i]] = final_weights
+
+        model.load_state_dict(filtered_state_dict, strict=False)
+
+    return model
+
+model = model_with_weights()
 
 # Here we get all file names in image dir
 file_names = [f for f in os.listdir(IMAGE_DIR) if f.endswith(( '.png'))]
 
 # Decide between random choice or run on certain image
 file_name = random.choice(file_names)
-# file_name = file_names[0]
+# file_name = file_names[5]
 
 print(file_name)
 
 image = skimage.io.imread(os.path.join(IMAGE_DIR, file_name))
+
+if image.shape[2] == 4:
+    image = image[:,:,:3]
 
 # Run detection
 results = model.detect([image])
