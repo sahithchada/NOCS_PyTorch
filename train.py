@@ -853,7 +853,7 @@ if __name__ == '__main__':
     print("Training network heads")
     model.train_model(trainset, valset,
                 learning_rate=config.LEARNING_RATE,
-                epochs=50,
+                epochs=2,
                 layers='heads')
 
     # Training - Stage 2
@@ -861,15 +861,20 @@ if __name__ == '__main__':
     print("Training Resnet layer 4+")
     model.train_model(trainset, valset,
                 learning_rate=config.LEARNING_RATE/10,
-                epochs=5,
+                epochs=4,
                 layers='4+')
 
+
+    # model = modellib.MaskRCNN(config=config, model_dir=MODEL_DIR)
+    # model.to(device)
+    # model.load_state_dict(torch.load('models/nocs_train20230420T2339/mask_rcnn_nocs_train_0006.pth'))
+    
     # Training - Stage 3
     # Finetune layers from ResNet stage 3 and up
     print("Training Resnet layer 3+")
     model.train_model(trainset, valset,
                 learning_rate=config.LEARNING_RATE/100,
-                epochs=10,
+                epochs=6,
                 layers='all')
     
 

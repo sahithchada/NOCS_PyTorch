@@ -674,13 +674,6 @@ def detection_target_layer(proposals, gt_class_ids, gt_boxes, gt_masks,gt_coords
             transposed_coord_x = transposed_coord_x.cuda()
             transposed_coord_y = transposed_coord_y.cuda()
             transposed_coord_z = transposed_coord_z.cuda()
-
-    
-        if config.GPU_COUNT:
-            transposed_coord_x = transposed_coord_x.cuda()
-            transposed_coord_y = transposed_coord_y.cuda()
-            transposed_coord_z = transposed_coord_z.cuda()
-
         
         roi_coord_x = transposed_coord_x[roi_gt_box_assignment]
         roi_coord_y = transposed_coord_y[roi_gt_box_assignment]
@@ -2600,14 +2593,14 @@ class MaskRCNN(nn.Module):
                 print('HI')
                 continue
 
-            # plt.figure()
+            plt.figure()
             # plt.subplot(1,3,1)
             # plt.imshow(images[0].permute(1,2,0))
             # plt.subplot(1,3,2)
             # plt.imshow(gt_masks[0].permute(1,2,0).sum(2))
             # plt.subplot(1,3,3)
-            # plt.imshow(gt_coords[0].sum(2))
-            # plt.savefig("output_images/output.png")
+            plt.imshow(gt_coords[0].sum(2))
+            plt.savefig("output_images/output.png")
             # image_metas as numpy array
             image_metas = image_metas.numpy()
 
@@ -2635,7 +2628,7 @@ class MaskRCNN(nn.Module):
             #coord_bin_loss = compute_mrcnn_coord_bins_symmetry_loss(target_mask, target_coords, target_class_ids, target_domain_labels, mrcnn_coords_bin)
 
             # Compute losses
-            rpn_class_loss, rpn_bbox_loss, mrcnn_class_loss, mrcnn_bbox_loss, mrcnn_mask_loss ,coord_bin_loss= compute_losses(rpn_match, rpn_bbox, rpn_class_logits, rpn_pred_bbox, target_class_ids, mrcnn_class_logits, target_deltas, mrcnn_bbox, target_mask, mrcnn_mask, mrcnn_coords_bin,target_coords,target_domain_labels)
+            rpn_class_loss, rpn_bbox_loss, mrcnn_class_loss, mrcnn_bbox_loss, mrcnn_mask_loss ,coord_bin_loss = compute_losses(rpn_match, rpn_bbox, rpn_class_logits, rpn_pred_bbox, target_class_ids, mrcnn_class_logits, target_deltas, mrcnn_bbox, target_mask, mrcnn_mask, mrcnn_coords_bin,target_coords,target_domain_labels)
             coord_x_bin_loss = coord_bin_loss[0]
             coord_y_bin_loss = coord_bin_loss[1]
             coord_z_bin_loss = coord_bin_loss[2]
@@ -2726,7 +2719,7 @@ class MaskRCNN(nn.Module):
                     target_domain_labels = target_domain_labels.cuda() 
 
                 # Compute losses
-                rpn_class_loss, rpn_bbox_loss, mrcnn_class_loss, mrcnn_bbox_loss, mrcnn_mask_loss ,coord_bin_loss= compute_losses(rpn_match, rpn_bbox, rpn_class_logits, rpn_pred_bbox, target_class_ids, mrcnn_class_logits, target_deltas, mrcnn_bbox, target_mask, mrcnn_mask, mrcnn_coords_bin,target_coords,target_domain_labels)
+                rpn_class_loss, rpn_bbox_loss, mrcnn_class_loss, mrcnn_bbox_loss, mrcnn_mask_loss ,coord_bin_loss = compute_losses(rpn_match, rpn_bbox, rpn_class_logits, rpn_pred_bbox, target_class_ids, mrcnn_class_logits, target_deltas, mrcnn_bbox, target_mask, mrcnn_mask, mrcnn_coords_bin,target_coords,target_domain_labels)
                 coord_x_bin_loss = coord_bin_loss[0]
                 coord_y_bin_loss = coord_bin_loss[1]
                 coord_z_bin_loss = coord_bin_loss[2]
