@@ -853,7 +853,7 @@ if __name__ == '__main__':
     print("Training network heads")
     model.train_model(trainset, valset,
                 learning_rate=config.LEARNING_RATE,
-                epochs=2,
+                epochs=10,
                 layers='heads')
 
     # Training - Stage 2
@@ -861,7 +861,7 @@ if __name__ == '__main__':
     print("Training Resnet layer 4+")
     model.train_model(trainset, valset,
                 learning_rate=config.LEARNING_RATE/10,
-                epochs=4,
+                epochs=3,
                 layers='4+')
 
 
@@ -874,7 +874,7 @@ if __name__ == '__main__':
     print("Training Resnet layer 3+")
     model.train_model(trainset, valset,
                 learning_rate=config.LEARNING_RATE/100,
-                epochs=6,
+                epochs=70,
                 layers='all')
     
 

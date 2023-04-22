@@ -27,7 +27,7 @@ MODEL_DIR = os.path.join(ROOT_DIR, "logs")
 # project (See README file for details)
 
 COCO_MODEL_PATH = os.path.join(ROOT_DIR, "models/mask_rcnn_coco.pth")
-TRAINED_PATH = 'models/nocs_train20230420T2101/mask_rcnn_nocs_train_0050.pth'
+TRAINED_PATH = 'models/nocs_train20230421T2236/mask_rcnn_nocs_train_0003.pth'
 
 # Directory of images to run detection on
 IMAGE_DIR = os.path.join(ROOT_DIR, "images")
@@ -155,8 +155,8 @@ model = model_with_weights()
 file_names = [f for f in os.listdir(IMAGE_DIR) if f.endswith(( '.png'))]
 
 # Decide between random choice or run on certain image
-file_name = random.choice(file_names)
-# file_name = file_names[5]
+# file_name = random.choice(file_names)
+file_name = file_names[3]
 
 print(file_name)
 
@@ -180,3 +180,22 @@ visualize.display_instances(image, rois, masks, class_ids, synset_names,file_nam
 plt.figure()
 plt.imshow(masks.sum(2))
 plt.savefig("output_images/mask_out.png")
+
+
+coord_gt = skimage.io.imread('images/0004_coord.png')
+coord_gt_y = coord_gt[:,:,1] 
+
+res_y = np.zeros((480,640))
+for i in range(len(coords)):
+
+    cord = coords[i]
+
+    y_cord = cord[:,:,1]
+    res_y += y_cord
+
+plt.figure()
+plt.subplot(2,1,1)
+plt.imshow(res_y)
+plt.subplot(2,1,2)
+plt.imshow(coord_gt_y)
+plt.savefig("output_images/y_coord.png")

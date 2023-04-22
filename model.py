@@ -104,7 +104,7 @@ def log2(x):
     ln2 = Variable(torch.log(torch.FloatTensor([2.0])), requires_grad=False)
     if x.is_cuda:
         ln2 = ln2.cuda()
-    return torch.log(x) / ln2
+    return torch.log(x + 1e-5) / ln2
 
 class SamePad2d(nn.Module):
     """Mimics tensorflow's 'SAME' padding.
@@ -759,31 +759,6 @@ def detection_target_layer(proposals, gt_class_ids, gt_boxes, gt_masks,gt_coords
         #masks_reshaped = torch.reshape(feature_maps[i], (1,n, h,w))
         masks = roi_align(masks_reshaped,boxes_and_ids, output_size=(config.MASK_SHAPE[0], config.MASK_SHAPE[1]), spatial_scale=masks_reshaped.shape[-1])
 
-        # image_vis = np.zeros((600,600,3))
-        # full_res = np.zeros((600,600))
-
-        # for i in range(masks.shape[0]):
-        
-        #     mask = masks[i,0]
-        #     bbox = level_boxes[i] * 600
-
-        #     full_mask = utils.unmold_mask(mask.detach().cpu().numpy(), bbox.detach().cpu().numpy().astype(np.uint8), full_res.shape)
-
-        #     full_res += full_mask
-        
-        # plt.figure()
-        # plt.imshow(full_res)
-        # plt.savefig('output_images/hello.png')
-
-        # visualize.display_instances(image_vis, level_boxes.detach().cpu().numpy(), masks[:,0,:,:].permute(1,2,0).detach().cpu().numpy(), box_ids.detach().cpu().numpy(), ['BG', #0
-        #             'bottle', #1
-        #             'bowl', #2
-        #             'camera', #3
-        #             'can',  #4
-        #             'laptop',#5
-        #             'mug'#6
-        #             ], 'hi_01' , scores=None,title="", figsize=(16, 16), ax=None)
-
         masks = Variable(masks.data, requires_grad=False)
         masks = masks.squeeze(1)
 
@@ -1223,6 +1198,7 @@ class Nocs_head_bins_wt_unshared(nn.Module):
         self.deconv = nn.ConvTranspose2d(256, 256, kernel_size=2, stride=2)
         self.conv5 = nn.Conv2d(256, self.num_bins * self.num_classes, kernel_size=1, stride=1)
         self.sigmoid = nn.Sigmoid()
+        self.softmax = nn.Softmax(dim=2)
         self.relu = nn.ReLU(inplace=True)
 
     def forward(self, x, rois):
@@ -1244,7 +1220,7 @@ class Nocs_head_bins_wt_unshared(nn.Module):
         x = self.conv5(x)
 
         x=x.view(x.shape[0], -1,self.num_bins, x.shape[2], x.shape[3])
-        x = self.sigmoid(x)
+        x = self.softmax(x)
 
         return x,x_feature
 
@@ -1544,42 +1520,22 @@ def compute_mrcnn_coord_bins_symmetry_loss(target_masks, target_coords, target_c
             y_true_bins_stack = y_true_bins_stack.to(torch.int64)
 
             y_true_bins_stack = torch.clamp(y_true_bins_stack, min=0, max=num_bins-1)
-            # y_true_bins_stack = torch.nn.functional.one_hot(y_true_bins_stack, num_classes=num_bins) #check for errors because of clamp
-            #y_true_bins_stack = torch.nn.functional.one_hot(y_true_bins_stack, num_classes=num_bins)
 
-            # y_true_bins_stack = y_true_stack * num_bins - 0.000001
-            # y_true_bins_stack = torch.floor(y_true_bins_stack)
-            # y_true_bins_stack = y_true_bins_stack.to(torch.int32)
-            # y_true_bins_stack = torch.nn.functional.one_hot(y_true_bins_stack, num_bins).permute(0, 1, 2, 3, 5, 4)
-            # print(indices[0])
-            # print(indices[1])
-            # indices_expanded = indices.unsqueeze(-1).expand(-1, -1, -1, y_true_stack.size(3), pred_coords_trans.size(-1))
-            # y_pred = torch.gather(pred_coords_trans, 4, indices_expanded)
-            # y_pred = y_pred.unsqueeze(3)
-            # y_pred_stack = y_pred.repeat(1, 1, 1, y_true_stack.size(3), 1, 1)
-            # y_pred = pred_coords_trans[indices[0], indices[1]]
-            # y_pred = y_pred.unsqueeze(3)
-            # y_pred_stack = y_pred.repeat(1, 1, 1, y_true_stack.shape[3], 1, 1)
-            # Gather elements from pred_coords_trans using indices
-            # Assuming pred_coords_trans and indices are PyTorch tensors with the given shapes
-            #gather_nd(params, indices)
+
             y_pred = gather_nd_torch(pred_coords_trans, indices)
             y_pred = y_pred.unsqueeze(3)  # shape: [num_pos_roi, height, width, 1, 3, num_bins]
+
             # Tile y_pred to match the shape of y_true_stack
             y_pred_stack = y_pred.repeat(1, 1, 1, y_true_stack.size(3), 1, 1)
 
-            # 
+            y_pred_logits=torch.log(y_pred_stack+1e-5).permute(0,5,1,2,3,4)
+            cross_loss = F.nll_loss(y_pred_logits, y_true_bins_stack,reduction='none')
 
-            cross_loss = torch.nn.functional.cross_entropy(y_pred_stack.permute(0,5,1,2,3,4), y_true_bins_stack,reduction='none') # check the value of this
+            # cross_loss = torch.nn.functional.cross_entropy(y_pred_stack.permute(0,5,1,2,3,4), y_true_bins_stack,reduction='none') # check the value of this
 
-            # cross_loss = F.nll_loss(y_pred_stack.permute(0,5,1,2,3,4).log(), y_true_bins_stack.argmax(dim=-1))
-
-            # cross_loss = F.nll_loss(y_pred_stack.permute(0,5,1,2,3,4).log(), y_true_bins_stack,reduction='none') # check the value of this
-
-            # #mask = target_masks[positive_ix]
             mask = torch.index_select(target_masks, 0, positive_ix) ## shape: [num_pixels_in_mask, 6, 3]
             mask = torch.index_select(target_masks, 0, positive_ix) ## shape: [num_pixels_in_mask, 6, 3]
-            reshape_mask = mask.reshape(mask.shape[0], mask.shape[1], mask.shape[2], 1, 1)
+            reshape_mask = mask.reshape(mask.shape[0], mask.shape[1], mask.shape[2], 1, 1) 
             ## shape: [num_pos_rois, height, width, 1, 1]
 
             num_of_pixels = mask.sum(dim=[1, 2]) + 0.00001 ## shape: [num_pos_rois]
@@ -1597,21 +1553,12 @@ def compute_mrcnn_coord_bins_symmetry_loss(target_masks, target_coords, target_c
 
             sym_loss = mean_loss_in_mask.mean(0)
 
-            # min_indices = tf.stack([tf.range(tf.shape(arg_min_rotation)[0]), arg_min_rotation], axis=-1)
-            # min_loss_in_mask = tf.gather_nd(sum_loss_in_mask, min_indices)  ## shape: [num_pos_rois, 3]
-            # mean_loss_in_mask = tf.divide(min_loss_in_mask, tf.expand_dims(num_of_pixels, axis=1))  ## shape: [num_pos_rois, 3]
-            # sym_loss = tf.reduce_mean(mean_loss_in_mask, axis=0)  ## shape:[3]
-
-            # sum_loss_in_mask = cross_loss_in_mask.sum(dim=[1, 2, 3, 4]) / num_of_pixels
             return sym_loss
-
-        def zero_positive_loss(target_masks, target_coords, pred_coords_trans, positive_ix):
-            return torch.tensor([0.0, 0.0, 0.0])
 
         if positive_ix.numel() > 0:
             loss = nonzero_positive_loss(target_masks, target_coords, pred_coords_trans, positive_ix)
         else:
-            loss = zero_positive_loss(target_masks, target_coords, pred_coords_trans, positive_ix)
+            loss = torch.tensor([0.0, 0.0, 0.0])
         
     
     else:
@@ -1629,6 +1576,15 @@ def compute_losses(rpn_match, rpn_bbox, rpn_class_logits, rpn_pred_bbox, target_
     mrcnn_class_loss = compute_mrcnn_class_loss(target_class_ids, mrcnn_class_logits)
     mrcnn_bbox_loss = compute_mrcnn_bbox_loss(target_deltas, target_class_ids, mrcnn_bbox)
     mrcnn_mask_loss = compute_mrcnn_mask_loss(target_mask, target_class_ids, mrcnn_mask)
+
+    target_mask_np = target_mask.detach().cpu().numpy()
+    target_coords_np = target_coords.detach().cpu().numpy()
+    target_class_ids_np = target_class_ids.detach().cpu().numpy()
+    target_domain_labels_np = target_domain_labels.detach().cpu().numpy()
+    pred_coords_np = pred_coords.detach().cpu().numpy()
+
+    # np.savez('loss_inputs.npz', target_mask_np = target_mask_np , target_coords_np=target_coords_np, target_class_ids_np = target_class_ids_np, target_domain_labels_np = target_domain_labels_np, pred_coords_np = pred_coords_np)
+
     mrcnn_coord_bins_symmetry_loss=compute_mrcnn_coord_bins_symmetry_loss(target_mask, target_coords, target_class_ids, target_domain_labels, pred_coords)
 
     return [rpn_class_loss, rpn_bbox_loss, mrcnn_class_loss, mrcnn_bbox_loss, mrcnn_mask_loss,mrcnn_coord_bins_symmetry_loss]
@@ -2413,6 +2369,12 @@ class MaskRCNN(nn.Module):
             gt_boxes = input[3][:,:,:-1]
             gt_masks = input[4]
             gt_coords = input[5]
+
+
+
+
+
+            
             # Normalize coordinates
             h, w = self.config.IMAGE_SHAPE[:2]
             scale = Variable(torch.from_numpy(np.array([h, w, h, w])).float(), requires_grad=False)
@@ -2429,8 +2391,44 @@ class MaskRCNN(nn.Module):
                 detection_target_layer(rpn_rois, gt_class_ids, gt_boxes, gt_masks,gt_coords, self.config)
             target_coords = torch.stack([target_coord_x, target_coord_y, target_coord_z])
 
- 
-            # print(target_coords.shape)
+
+
+            def see_coords(h,w,boxes,image_metas,coords):
+
+                _, _, window, _ = parse_image_meta(image_metas)
+                window = window.flatten()
+                # Compute scale and shift to translate coordinates to image domain.
+                h_scale = h / (window[2] - window[0])
+                w_scale = w / (window[3] - window[1])
+                scale = min(h_scale, w_scale)
+                shift = window[:2]  # y, x
+                scales = np.array([scale, scale, scale, scale])
+                shifts = np.array([shift[0], shift[1], shift[0], shift[1]])
+
+                # Translate bounding boxes to image domain
+                boxes = np.multiply(boxes - shifts, scales).astype(np.int32)
+
+                # Filter out detections with zero area. Often only happens in early
+                # stages of training when the network weights are still a bit random.
+                exclude_ix = np.where(
+                    (boxes[:, 2] - boxes[:, 0]) * (boxes[:, 3] - boxes[:, 1]) <= 0)[0]
+                if exclude_ix.shape[0] > 0:
+                    boxes = np.delete(boxes, exclude_ix, axis=0)
+                    coords = np.delete(coords, exclude_ix, axis=0)
+                    N = boxes.shape[0]
+
+
+                N = boxes.shape[0]
+                if N > 0:
+
+                    for i in range(N):
+
+                        full_coord = utils.unmold_coord(coords[i], boxes[i], (h,w))
+                        plt.figure()
+                        plt.imshow(full_coord)
+                        plt.savefig('output_images/fullcoord.png')
+
+
             if not rois.size()[0]:
                 mrcnn_class_logits = Variable(torch.FloatTensor())
                 mrcnn_class = Variable(torch.IntTensor())
@@ -2462,6 +2460,8 @@ class MaskRCNN(nn.Module):
                 # Network Heads
                 # Proposal classifier and BBox regressor heads
                 mrcnn_class_logits, mrcnn_class, mrcnn_bbox = self.classifier(mrcnn_feature_maps, rois)
+
+                # see_coords(h,w,rois.cpu().detach().numpy(),image_metas,target_coords.permute(1,2,3,0).cpu().detach().numpy())
 
                 # Create masks for detections
                 mrcnn_mask = self.mask(mrcnn_feature_maps, rois)
@@ -2505,11 +2505,11 @@ class MaskRCNN(nn.Module):
         # Pre-defined layer regular expressions
         layer_regex = {
             # all layers but the backbone
-            "heads": r"(fpn.P5\_.*)|(fpn.P4\_.*)|(fpn.P3\_.*)|(fpn.P2\_.*)|(rpn.*)|(classifier.*)|(mask.*)",
+            "heads": r"(fpn.P5\_.*)|(fpn.P4\_.*)|(fpn.P3\_.*)|(fpn.P2\_.*)|(rpn.*)|(classifier.*)|(mask.*)|(nocs_head_x.*)|(nocs_head_y.*)|(nocs_head_z.*)",
             # From a specific Resnet stage and up
-            "3+": r"(fpn.C3.*)|(fpn.C4.*)|(fpn.C5.*)|(fpn.P5\_.*)|(fpn.P4\_.*)|(fpn.P3\_.*)|(fpn.P2\_.*)|(rpn.*)|(classifier.*)|(mask.*)",
-            "4+": r"(fpn.C4.*)|(fpn.C5.*)|(fpn.P5\_.*)|(fpn.P4\_.*)|(fpn.P3\_.*)|(fpn.P2\_.*)|(rpn.*)|(classifier.*)|(mask.*)",
-            "5+": r"(fpn.C5.*)|(fpn.P5\_.*)|(fpn.P4\_.*)|(fpn.P3\_.*)|(fpn.P2\_.*)|(rpn.*)|(classifier.*)|(mask.*)",
+            "3+": r"(fpn.C3.*)|(fpn.C4.*)|(fpn.C5.*)|(fpn.P5\_.*)|(fpn.P4\_.*)|(fpn.P3\_.*)|(fpn.P2\_.*)|(rpn.*)|(classifier.*)|(mask.*)|(nocs_head_x.*)|(nocs_head_y.*)|(nocs_head_z.*)",
+            "4+": r"(fpn.C4.*)|(fpn.C5.*)|(fpn.P5\_.*)|(fpn.P4\_.*)|(fpn.P3\_.*)|(fpn.P2\_.*)|(rpn.*)|(classifier.*)|(mask.*)|(nocs_head_x.*)|(nocs_head_y.*)|(nocs_head_z.*)",
+            "5+": r"(fpn.C5.*)|(fpn.P5\_.*)|(fpn.P4\_.*)|(fpn.P3\_.*)|(fpn.P2\_.*)|(rpn.*)|(classifier.*)|(mask.*)|(nocs_head_x.*)|(nocs_head_y.*)|(nocs_head_z.*)",
             # All layers
             "all": ".*",
         }
@@ -2592,14 +2592,14 @@ class MaskRCNN(nn.Module):
                 batch_count -= 1
                 continue
 
-            plt.figure()
+            # plt.figure()
             # plt.subplot(1,3,1)
             # plt.imshow(images[0].permute(1,2,0))
             # plt.subplot(1,3,2)
             # plt.imshow(gt_masks[0].permute(1,2,0).sum(2))
             # plt.subplot(1,3,3)
-            plt.imshow(gt_coords[0].sum(2))
-            plt.savefig("output_images/output.png")
+            # plt.imshow(gt_coords[0].sum(2))
+            # plt.savefig("output_images/output.png")
             # image_metas as numpy array
             image_metas = image_metas.numpy()
 
