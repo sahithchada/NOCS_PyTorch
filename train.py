@@ -501,7 +501,7 @@ class SyntheticData(utils.Dataset):
 
         # flip z axis of coord map
         coord_map = np.array(coord_map, dtype=np.float32) / 255
-        coord_map[:, :, 2] = 1 - coord_map[:, :, 2]
+        # coord_map[:, :, 2] = 1 - coord_map[:, :, 2]
 
 
         masks = np.zeros([h, w, num_instance], dtype=np.uint8)

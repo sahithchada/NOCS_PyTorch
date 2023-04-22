@@ -1,4 +1,4 @@
-"""
+"""op_and_resize
 Mask R-CNN
 The main Mask R-CNN model implemenetation.
 
@@ -12,6 +12,7 @@ import math
 import os
 import random
 import re
+import torchvision
 
 
 import numpy as np
@@ -599,10 +600,6 @@ def detection_target_layer(proposals, gt_class_ids, gt_boxes, gt_masks,gt_coords
     gt_masks = gt_masks.squeeze(0)
     gt_coords=gt_coords.squeeze(0)
     
-    # plt.figure()
-    # plt.imshow(gt_masks.cpu().sum(0))
-    # plt.savefig('output_images/mask1.png')
-
     # Handle COCO crowds
     # A crowd box in COCO is a bounding box around several instances. Exclude
     # them from training. A crowd box is given a negative class ID.
@@ -666,14 +663,13 @@ def detection_target_layer(proposals, gt_class_ids, gt_boxes, gt_masks,gt_coords
         #############COMPUTE TRANSPOSED COORDS##################
         
         transposed_coords = gt_coords.permute(2, 0, 1, 3)
+
+        if config.GPU_COUNT:
+            transposed_coords = transposed_coords.cuda()
+
         transposed_coord_x = transposed_coords[:, :, :, 0:1]
         transposed_coord_y = transposed_coords[:, :, :, 1:2]
         transposed_coord_z = transposed_coords[:, :, :, 2:3]
-
-        if config.GPU_COUNT:
-            transposed_coord_x = transposed_coord_x.cuda()
-            transposed_coord_y = transposed_coord_y.cuda()
-            transposed_coord_z = transposed_coord_z.cuda()
         
         roi_coord_x = transposed_coord_x[roi_gt_box_assignment]
         roi_coord_y = transposed_coord_y[roi_gt_box_assignment]
@@ -696,37 +692,8 @@ def detection_target_layer(proposals, gt_class_ids, gt_boxes, gt_masks,gt_coords
         box_ids = Variable(torch.arange(roi_masks.size()[0]), requires_grad=False).int()
         #############COMPUTE COORDS##################
 
-
-        '''
-        coord_x = F.interpolate(torch.tensor(roi_coord_x, dtype=torch.float32),
-                                size=config.COORD_SHAPE,
-                                mode='bilinear', align_corners=True)
-        coord_y = F.interpolate(torch.tensor(roi_coord_y, dtype=torch.float32),
-                                size=config.COORD_SHAPE,
-                                mode='bilinear', align_corners=True)
-        coord_z = F.interpolate(torch.tensor(roi_coord_z, dtype=torch.float32),
-                                size=config.COORD_SHAPE,
-                                mode='bilinear', align_corners=True)
-        '''
-        ##################################################
-
-
         if config.GPU_COUNT:
             box_ids = box_ids.cuda()
-        #feature_maps[i] = feature_maps[i].unsqueeze(0)  #CropAndResizeFunction needs batch dimension
-        #pooled_features = CropAndResizeFunction(pool_size, pool_size, 0)(feature_maps[i], level_boxes, ind)
-        #feature_maps[i] = feature_maps[i].unsqueeze(0)  #CropAndResizeFunction needs batch dimension
-        #pooled_features = CropAndResizeFunction(pool_size, pool_size, 0)(feature_maps[i], level_boxes, ind)
-
-
-        # feature_maps_reshaped = torch.reshape(feature_maps[i], (1,n, h,w))
-
-
-        # roi_align1 = RoIAlign((pool_size, pool_size), spatial_scale=feature_maps[i].shape[1]/image_shape[0],sampling_ratio=-1)
-
-
-        # pooled_features=roi_align1(feature_maps_reshaped,level_boxes)
-        # pooled.append(pooled_features)
         
         level_boxes = boxes[:, [1, 0, 3, 2]].clone()
         indexes = torch.zeros(level_boxes.shape[0], 1)
@@ -735,22 +702,6 @@ def detection_target_layer(proposals, gt_class_ids, gt_boxes, gt_masks,gt_coords
         #level_boxes = torch.cat((indexes, level_boxes), dim=1)
         if config.GPU_COUNT:
             indexes = indexes.cuda()
-        '''
-        level_boxes = torch.cat((indexes, level_boxes), dim=1)
-        n,h,w=roi_masks.shape
-        feature_maps_reshaped = torch.reshape(roi_masks.unsqueeze(1), (1,n, h,w))
-
-        
-        roi_align1 = RoIAlign((config.MASK_SHAPE[0], config.MASK_SHAPE[1]), spatial_scale=1,sampling_ratio=-1)
-
-        masks=roi_align1(feature_maps_reshaped,level_boxes)
-        
-        #masks = Variable(CropAndResizeFunction(config.MASK_SHAPE[0], config.MASK_SHAPE[1], 0)(roi_masks.unsqueeze(1), boxes, box_ids).data, requires_grad=False)
-        #masks = masks.squeeze(1)
-        masks=torch.reshape(masks,(-1,masks.shape[2],masks.shape[3]))
-
-        masks=Variable(masks.data, requires_grad=False)
-        '''
 
         masks_reshaped = roi_masks.unsqueeze(1)
 
@@ -782,26 +733,6 @@ def detection_target_layer(proposals, gt_class_ids, gt_boxes, gt_masks,gt_coords
         roi_coord_z = Variable(roi_coord_z.data, requires_grad=False)
         coord_z = roi_coord_z.squeeze(1)
 
-
-        '''
-        n,h,w=roi_masks.shape
-        roi_align_x = RoIAlign((config.COORD_SHAPE[0], config.COORD_SHAPE[1]), spatial_scale=h,sampling_ratio=-1)
-        roi_align_y = RoIAlign((config.COORD_SHAPE[0], config.COORD_SHAPE[1]), spatial_scale=h,sampling_ratio=-1)
-        roi_align_z = RoIAlign((config.COORD_SHAPE[0], config.COORD_SHAPE[1]), spatial_scale=h,sampling_ratio=-1)
-        roi_coord_x_reshaped=torch.permute(roi_coord_x, (3, 0, 1,2))
-        roi_coord_y_reshaped=torch.permute(roi_coord_y, (3, 0, 1,2))
-        roi_coord_z_reshaped=torch.permute(roi_coord_z, (3, 0, 1,2))
-
-        coord_x=roi_align_x(roi_coord_x_reshaped,level_boxes)
-        coord_y=roi_align_y(roi_coord_y_reshaped,level_boxes)
-        coord_z=roi_align_z(roi_coord_z_reshaped,level_boxes)
-        
-        #masks = Variable(CropAndResizeFunction(config.MASK_SHAPE[0], config.MASK_SHAPE[1], 0)(roi_masks.unsqueeze(1), boxes, box_ids).data, requires_grad=False)
-        #masks = masks.squeeze(1)
-        coord_x=torch.reshape(coord_x,(-1,coord_x.shape[2],coord_x.shape[3]))
-        coord_y=torch.reshape(coord_y,(-1,coord_y.shape[2],coord_y.shape[3]))
-        coord_z=torch.reshape(coord_z,(-1,coord_z.shape[2],coord_z.shape[3]))
-        '''
 
     else:
         positive_count = 0
@@ -879,26 +810,215 @@ def detection_target_layer(proposals, gt_class_ids, gt_boxes, gt_masks,gt_coords
             coord_y=coord_y.cuda()
             coord_z=coord_z.cuda()
 
-    ##########COMPUTE FINAL  X,Y,Z,coords#############################
-    '''
-    N = negative_rois.size(0)
-    P = max(config.TRAIN_ROIS_PER_IMAGE - rois.size(0), 0)
-    coord_x = torch.squeeze(coord_x, dim=3)
-    coord_y = torch.squeeze(coord_y, dim=3)
-    coord_z = torch.squeeze(coord_z, dim=3)
-    
-    coord_x = torch.nn.functional.pad(coord_x, (0, 0, 0, N + P, 0, 0), mode='constant', value=0)
-    coord_y = torch.nn.functional.pad(coord_y, (0, 0, 0, N + P, 0, 0), mode='constant', value=0)
-    coord_z = torch.nn.functional.pad(coord_z, (0, 0, 0, N + P, 0, 0), mode='constant', value=0)
-
-    coord_x = coord_x.float()
-    coord_y = coord_y.float()
-    coord_z = coord_z.float()
-    '''
-    ##############################################################################
 
     return rois, roi_gt_class_ids, deltas, masks,coord_x, coord_y, coord_z
 
+
+def detection_target_layer_2(proposals, gt_class_ids, gt_boxes, gt_masks,gt_coords,config):
+    """Subsamples proposals and generates target box refinment, class_ids,
+    and masks for each.
+    #detection_targets_graph
+
+    Inputs:
+    proposals: [batch, N, (y1, x1, y2, x2)] in normalized coordinates. Might
+               be zero padded if there are not enough proposals.
+    gt_class_ids: [batch, MAX_GT_INSTANCES] Integer class IDs.
+    gt_boxes: [batch, MAX_GT_INSTANCES, (y1, x1, y2, x2)] in normalized
+              coordinates.
+    gt_masks: [batch, height, width, MAX_GT_INSTANCES] of boolean type
+
+    Returns: Target ROIs and corresponding class IDs, bounding box shifts,
+    and masks.
+    rois: [batch, TRAIN_ROIS_PER_IMAGE, (y1, x1, y2, x2)] in normalized
+          coordinates
+    target_class_ids: [batch, TRAIN_ROIS_PER_IMAGE]. Integer class IDs.
+    target_deltas: [batch, TRAIN_ROIS_PER_IMAGE, NUM_CLASSES,
+                    (dy, dx, log(dh), log(dw), class_id)]
+                   Class-specific bbox refinments.
+    target_mask: [batch, TRAIN_ROIS_PER_IMAGE, height, width)
+                 Masks cropped to bbox boundaries and resized to neural
+                 network output size.
+    target_coord: [[batch, TRAIN_ROIS_PER_IMAGE, height, width,3)]
+    """
+
+    # Currently only supports batchsize 1
+    proposals = proposals.squeeze(0)
+    gt_class_ids = gt_class_ids.squeeze(0)
+    gt_boxes = gt_boxes.squeeze(0)
+    gt_masks = gt_masks.squeeze(0)
+    gt_coords=gt_coords.squeeze(0)
+    
+    # Remove proposals zero padding
+    non_zeros = torch.abs(proposals).sum(dim=1).to(torch.bool)
+    proposals = proposals[non_zeros]
+
+    # Compute overlaps matrix [proposals, gt_boxes]
+    overlaps = bbox_overlaps(proposals, gt_boxes)
+
+    # Determine postive and negative ROIs
+    roi_iou_max = torch.max(overlaps, dim=1)[0]
+
+    # 1. Positive ROIs are those with >= 0.5 IoU with a GT box
+    positive_roi_bool = roi_iou_max >= 0.5
+
+    # Subsample ROIs. Aim for 33% positive
+    # Positive ROIs
+    if torch.nonzero(positive_roi_bool).size()[0]:
+        positive_indices = torch.nonzero(positive_roi_bool)[:, 0]
+
+        negative_indices = torch.nonzero(roi_iou_max < 0.5)[:, 0]
+
+        positive_count = int(config.TRAIN_ROIS_PER_IMAGE * config.ROI_POSITIVE_RATIO)
+
+        rand_idx = torch.randperm(positive_indices.size()[0])
+        rand_idx = rand_idx[:positive_count]
+        if config.GPU_COUNT:
+            rand_idx = rand_idx.cuda()
+        positive_indices = positive_indices[rand_idx]
+
+        negative_count = config.TRAIN_ROIS_PER_IMAGE - positive_indices.shape[0]
+        rand_idx = torch.randperm(negative_indices.size()[0])
+        rand_idx = rand_idx[:negative_count]
+        if config.GPU_COUNT:
+            rand_idx = rand_idx.cuda()
+        negative_indices = negative_indices[rand_idx]
+
+        positive_rois = proposals[positive_indices.data]
+        negative_rois = proposals[negative_indices.data]
+
+        # Assign positive ROIs to GT boxes.
+        positive_overlaps = overlaps[positive_indices.data,:]
+        roi_gt_box_assignment = torch.max(positive_overlaps, dim=1)[1]
+        roi_gt_boxes = gt_boxes[roi_gt_box_assignment.data,:]
+        roi_gt_class_ids = gt_class_ids[roi_gt_box_assignment.data]
+
+        # Compute bbox refinement for positive ROIs
+        deltas = utils.box_refinement(positive_rois.data, roi_gt_boxes.data)
+        std_dev = torch.from_numpy(config.BBOX_STD_DEV).float()
+        if config.GPU_COUNT:
+            std_dev = std_dev.cuda()
+        deltas /= std_dev
+
+        transposed_masks = gt_masks.unsqueeze(-1).to(torch.float32)
+
+        transposed_coords = gt_coords.permute(2,0,1,3)
+
+        if config.GPU_COUNT:
+            transposed_coords = transposed_coords.cuda()
+
+        transposed_coords_x = transposed_coords[:,:,:,0:1]
+        transposed_coords_y = transposed_coords[:,:,:,1:2]
+        transposed_coords_z = transposed_coords[:,:,:,2:3]
+
+        torch._assert(transposed_coords_x.shape == transposed_coords_y.shape == transposed_coords_z.shape == transposed_masks.shape
+                      , 'coord_mask')
+
+        roi_masks = transposed_masks[roi_gt_box_assignment.data]
+        roi_coord_x = transposed_coords_x[roi_gt_box_assignment.data]
+        roi_coord_y = transposed_coords_y[roi_gt_box_assignment.data]
+        roi_coord_z = transposed_coords_z[roi_gt_box_assignment.data]
+
+        boxes = positive_rois
+        if config.USE_MINI_MASK:
+            # Transform ROI corrdinates from normalized image space
+            # to normalized mini-mask space.
+            y1, x1, y2, x2 = positive_rois.chunk(4, dim=1)
+            gt_y1, gt_x1, gt_y2, gt_x2 = roi_gt_boxes.chunk(4, dim=1)
+            gt_h = gt_y2 - gt_y1
+            gt_w = gt_x2 - gt_x1
+            y1 = (y1 - gt_y1) / gt_h
+            x1 = (x1 - gt_x1) / gt_w
+            y2 = (y2 - gt_y1) / gt_h
+            x2 = (x2 - gt_x1) / gt_w
+            boxes = torch.cat([y1, x1, y2, x2], dim=1)
+
+        box_ids = torch.arange(roi_masks.shape[0]).int()
+
+        torch._assert(roi_masks.shape == roi_coord_x.shape == roi_coord_y.shape == roi_coord_z.shape
+                      , 'coord_mask2')
+        
+        def crop_and_resize(image,boxes,box_indices,crop_size):
+            #[num_boxes, crop_height, crop_width, depth].
+            h,w = image.shape[1], image.shape[2]
+            result = torch.empty(boxes.shape[0],crop_size[0],crop_size[1],image.shape[-1])
+
+            for i in range(boxes.shape[0]):
+
+                box = boxes[i]
+                y1, x1, y2, x2 = box[0], box[1], box[2], box[3]
+
+                y1 = torch.round(y1 * (h - 1)).int()
+                y2 = torch.round(y2 * (h - 1)).int()
+                x1 = torch.round(x1 * (w - 1)).int()
+                x2 = torch.round(x2 * (w - 1)).int()
+
+                crop = image[i:i+1,y1:y2+1,x1:x2+1]
+
+                resized_crop = torchvision.transforms.functional.resize(crop.permute(0,3,1,2),crop_size,antialias = True)
+                result[i] = resized_crop.permute(0,2,3,1)
+
+                # plt.figure()
+                # plt.subplot(2,1,1)
+                # plt.imshow(crop[0,:,:,0].detach().cpu())
+                # plt.subplot(2,1,2)
+                # plt.imshow(resized_crop.permute(0,2,3,1)[0,:,:,0].detach().cpu())
+                # plt.savefig('output_images/haha.png')
+
+            return result
+
+
+
+        # TODO: IMAGE CROP AND RESIZE
+        masks = crop_and_resize(roi_masks.to(torch.float32),boxes,box_ids,config.MASK_SHAPE)
+        coord_x = crop_and_resize(roi_coord_x.to(torch.float32),boxes,box_ids,config.MASK_SHAPE)
+        coord_y = crop_and_resize(roi_coord_y.to(torch.float32),boxes,box_ids,config.MASK_SHAPE)
+        coord_z = crop_and_resize(roi_coord_z.to(torch.float32),boxes,box_ids,config.MASK_SHAPE)
+        #############################
+
+        masks = masks.squeeze(3).round()
+
+        rois = torch.cat([positive_rois, negative_rois], dim=0)
+        N = negative_rois.shape[0]
+        P = max(config.TRAIN_ROIS_PER_IMAGE - rois.shape[0],0)
+        rois = F.pad(rois, (0, 0, 0, P))
+        roi_gt_boxes = F.pad(roi_gt_boxes, (0, 0, 0, N+P))
+        deltas = F.pad(deltas, (0, 0, 0, N+P))
+        masks = F.pad(masks, (0, 0, 0, 0, 0, N+P))
+        roi_gt_class_ids = F.pad(roi_gt_class_ids,(0,N+P))
+        # roi_gt_class_ids = roi_gt_boxes[:, 4]
+             
+        coord_x = coord_x.squeeze(3)
+        coord_y = coord_y.squeeze(3)
+        coord_z = coord_z.squeeze(3)
+
+        coord_x = F.pad(coord_x, (0, 0, 0, 0, 0, N+P))
+        coord_y = F.pad(coord_y, (0, 0, 0, 0, 0, N+P))
+        coord_z = F.pad(coord_z, (0, 0, 0, 0,0, N+P))
+
+        coord_x = coord_x.to(torch.float32)
+        coord_y = coord_y.to(torch.float32)
+        coord_z = coord_z.to(torch.float32)
+
+    else:
+        rois = torch.FloatTensor()
+        roi_gt_class_ids = torch.IntTensor()
+        deltas = torch.FloatTensor()
+        masks = torch.FloatTensor()
+        coord_x = torch.FloatTensor()
+        coord_y = torch.FloatTensor()
+        coord_z = torch.FloatTensor()
+
+
+    if config.GPU_COUNT:
+        rois = rois.cuda()
+        roi_gt_class_ids = roi_gt_class_ids.cuda()
+        deltas = deltas.cuda()
+        masks = masks.cuda()
+        coord_x=coord_x.cuda()
+        coord_y=coord_y.cuda()
+        coord_z=coord_z.cuda()
+
+    return rois, roi_gt_class_ids, deltas, masks,coord_x, coord_y, coord_z
 
 ############################################################
 #  Detection Layer
@@ -1173,7 +1293,6 @@ class Mask(nn.Module):
 
         return x
     
-#working 
 # add net_name
 #nocs head
 class Nocs_head_bins_wt_unshared(nn.Module):
@@ -1452,6 +1571,18 @@ def compute_mrcnn_coord_bins_symmetry_loss(target_masks, target_coords, target_c
         #transforms to match the required input dimentions
         target_coords=torch.permute(target_coords,(1,2,3,0))
         pred_coords=torch.permute(pred_coords,(1,4,5,2,3,0))
+
+        # mask_numpy= target_masks.detach().cpu().numpy()
+        # coord_numpy=target_coords.detach().cpu().numpy()
+        # for i in range(target_masks.shape[0]):
+        #     print(target_class_ids[i])
+        #     cv2.imshow("coords_x",coord_numpy[i,:,:,0])
+        #     cv2.imshow("coords_y",coord_numpy[i,:,:,1])
+        #     cv2.imshow("coords_z",coord_numpy[i,:,:,2])
+        #     cv2.imshow("mask",mask_numpy[i])
+        #     cv2.imshow("coords_all",coord_numpy[i])
+        #     cv2.waitKey(0)
+
         target_masks=torch.unsqueeze(target_masks, 0)
 
         # Reshape for simplicity. Merge first two dimensions into one.
@@ -1514,6 +1645,17 @@ def compute_mrcnn_coord_bins_symmetry_loss(target_masks, target_coords, target_c
             y_true_stack = y_true_stack.permute(0, 1, 2, 4, 3)## shape: [num_pos_rois, height, width, 6, 3]
             y_true_stack = y_true_stack + 0.5
 
+            y_true_stack_numpy=y_true_stack.detach().cpu().numpy()
+            mask_numpy= target_masks.detach().cpu().numpy()
+            for i in range(y_true_stack.shape[0]):
+                print(target_class_ids[i])
+                cv2.imshow("mask",mask_numpy[i])
+                for j in range(y_true_stack_numpy.shape[3]):
+                    squeezed=y_true_stack_numpy[i,:,:,j,:]
+
+                    cv2.imshow("coords"+str(j),squeezed)
+
+                cv2.waitKey(0)
 
             y_true_bins_stack = y_true_stack * float(num_bins) - 1e-6
             y_true_bins_stack = torch.floor(y_true_bins_stack)
@@ -2370,11 +2512,13 @@ class MaskRCNN(nn.Module):
             gt_masks = input[4]
             gt_coords = input[5]
 
+            # plt.figure()
+            # plt.subplot(2,1,1)
+            # plt.imshow(gt_masks[0].permute(1,2,0).sum(2).detach().cpu())
+            # plt.subplot(2,1,2)
+            # plt.imshow(gt_coords[0].sum(2).detach().cpu())
+            # plt.savefig('output_images/hello.png')
 
-
-
-
-            
             # Normalize coordinates
             h, w = self.config.IMAGE_SHAPE[:2]
             scale = Variable(torch.from_numpy(np.array([h, w, h, w])).float(), requires_grad=False)
@@ -2388,7 +2532,7 @@ class MaskRCNN(nn.Module):
             # padded. Equally, returned rois and targets are zero padded.
             
             rois, target_class_ids, target_deltas, target_mask,target_coord_x, target_coord_y, target_coord_z = \
-                detection_target_layer(rpn_rois, gt_class_ids, gt_boxes, gt_masks,gt_coords, self.config)
+                detection_target_layer_2(rpn_rois, gt_class_ids, gt_boxes, gt_masks,gt_coords, self.config)
             target_coords = torch.stack([target_coord_x, target_coord_y, target_coord_z])
 
 
