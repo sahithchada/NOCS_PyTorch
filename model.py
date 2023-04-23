@@ -1647,15 +1647,15 @@ def compute_mrcnn_coord_bins_symmetry_loss(target_masks, target_coords, target_c
 
             y_true_stack_numpy=y_true_stack.detach().cpu().numpy()
             mask_numpy= target_masks.detach().cpu().numpy()
-            for i in range(y_true_stack.shape[0]):
-                print(target_class_ids[i])
-                cv2.imshow("mask",mask_numpy[i])
-                for j in range(y_true_stack_numpy.shape[3]):
-                    squeezed=y_true_stack_numpy[i,:,:,j,:]
+            # for i in range(y_true_stack.shape[0]):
+            #     print(target_class_ids[i])
+            #     cv2.imshow("mask",mask_numpy[i])
+            #     for j in range(y_true_stack_numpy.shape[3]):
+            #         squeezed=y_true_stack_numpy[i,:,:,j,:]
 
-                    cv2.imshow("coords"+str(j),squeezed)
+            #         cv2.imshow("coords"+str(j),squeezed)
 
-                cv2.waitKey(0)
+            #     cv2.waitKey(0)
 
             y_true_bins_stack = y_true_stack * float(num_bins) - 1e-6
             y_true_bins_stack = torch.floor(y_true_bins_stack)
@@ -2454,27 +2454,6 @@ class MaskRCNN(nn.Module):
                 scale = scale.cuda()
             detection_boxes = detections[:, :4] / scale
 
-
-            '''
-            
-            print(torch.max(detections[:, :4]))
-            ROOT_DIR = os.getcwd()
-            IMAGE_DIR = os.path.join(ROOT_DIR, "images")
-            file_names = next(os.walk(IMAGE_DIR))[2]
-            #image = skimage.io.imread(os.path.join(IMAGE_DIR, random.choice(file_names)))
-            image = skimage.io.imread(os.path.join(IMAGE_DIR, file_names[1]))
-            for i in range(detections.shape[0]):
-                h1,w1=image.shape[:2]
-                scale1 = Variable(torch.from_numpy(np.array([h1, w1-20, h1, w1])).float(), requires_grad=False)
-                detections[i,[1,3]]=detections[i, [1,3]]-110
-                #testmask=detections[i,[1,3]]
-                #image=visualize.draw_box(image,testmask.int(), [220,220,0])
-                image = cv2.resize(image, dsize=(1024, 1024), interpolation=cv2.INTER_CUBIC)
-                image=visualize.draw_box(image,detections[i,:4].int(), [220,220,0])
-                print(image.shape)
-            imgplot = plt.imshow(image)
-            plt.savefig("test.png")
-            '''
             # Add back batch dimension
             detection_boxes = detection_boxes.unsqueeze(0)
 
@@ -2568,9 +2547,9 @@ class MaskRCNN(nn.Module):
                     for i in range(N):
 
                         full_coord = utils.unmold_coord(coords[i], boxes[i], (h,w))
-                        plt.figure()
-                        plt.imshow(full_coord)
-                        plt.savefig('output_images/fullcoord.png')
+                        # plt.figure()
+                        # plt.imshow(full_coord)
+                        # plt.savefig('output_images/fullcoord.png')
 
 
             if not rois.size()[0]:
@@ -2604,8 +2583,6 @@ class MaskRCNN(nn.Module):
                 # Network Heads
                 # Proposal classifier and BBox regressor heads
                 mrcnn_class_logits, mrcnn_class, mrcnn_bbox = self.classifier(mrcnn_feature_maps, rois)
-
-                # see_coords(h,w,rois.cpu().detach().numpy(),image_metas,target_coords.permute(1,2,3,0).cpu().detach().numpy())
 
                 # Create masks for detections
                 mrcnn_mask = self.mask(mrcnn_feature_maps, rois)
@@ -2736,14 +2713,6 @@ class MaskRCNN(nn.Module):
                 batch_count -= 1
                 continue
 
-            # plt.figure()
-            # plt.subplot(1,3,1)
-            # plt.imshow(images[0].permute(1,2,0))
-            # plt.subplot(1,3,2)
-            # plt.imshow(gt_masks[0].permute(1,2,0).sum(2))
-            # plt.subplot(1,3,3)
-            # plt.imshow(gt_coords[0].sum(2))
-            # plt.savefig("output_images/output.png")
             # image_metas as numpy array
             image_metas = image_metas.numpy()
 
@@ -2760,7 +2729,8 @@ class MaskRCNN(nn.Module):
             rpn_class_logits, rpn_pred_bbox, target_class_ids, mrcnn_class_logits, target_deltas,target_coords,mrcnn_bbox, target_mask, mrcnn_mask, pred_coords,mrcnn_coords_bin = \
                 self.predict([images, image_metas, gt_class_ids, gt_boxes, gt_masks,gt_coords,gt_domain_label], mode='training')
             
-            # print(gt_domain_label.shape,target_class_ids.shape)
+            
+
 
             target_domain_labels = torch.tile(gt_domain_label, (1, target_class_ids.shape[0]))
 
@@ -2838,6 +2808,9 @@ class MaskRCNN(nn.Module):
             # image_metas as numpy array
             image_metas = image_metas.numpy()
 
+            if rpn_bbox.sum() == 0:
+                continue
+
             with torch.no_grad():
 
                 # To GPU
@@ -2866,7 +2839,7 @@ class MaskRCNN(nn.Module):
                 coord_x_bin_loss = coord_bin_loss[0]
                 coord_y_bin_loss = coord_bin_loss[1]
                 coord_z_bin_loss = coord_bin_loss[2]
-                # print(mrcnn_coords_bin)
+                
                 loss = rpn_class_loss + rpn_bbox_loss + mrcnn_class_loss + mrcnn_bbox_loss + mrcnn_mask_loss+coord_x_bin_loss+coord_y_bin_loss+coord_z_bin_loss 
 
             # Progress

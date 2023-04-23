@@ -13,6 +13,7 @@ import model as modellib
 import visualize
 
 import torch
+import cv2
 
 
 # Root directory of the project
@@ -27,7 +28,7 @@ MODEL_DIR = os.path.join(ROOT_DIR, "logs")
 # project (See README file for details)
 
 COCO_MODEL_PATH = os.path.join(ROOT_DIR, "models/mask_rcnn_coco.pth")
-TRAINED_PATH = 'models/nocs_train20230422T1134/mask_rcnn_nocs_train_0007.pth'
+TRAINED_PATH = 'models/nocs_train20230422T1839/mask_rcnn_nocs_train_0025.pth'
 
 # Directory of images to run detection on
 IMAGE_DIR = os.path.join(ROOT_DIR, "images")
@@ -156,7 +157,7 @@ file_names = [f for f in os.listdir(IMAGE_DIR) if f.endswith(( '.png'))]
 
 # Decide between random choice or run on certain image
 # file_name = random.choice(file_names)
-file_name = file_names[3]
+file_name = file_names[8]
 
 print(file_name)
 
@@ -173,6 +174,10 @@ r = results[0]
 
 rois, masks, class_ids, scores, coords = r['rois'], r['masks'], r['class_ids'], r['scores'],r['coords']
 
+# cv2.imshow("coord0",coords[0])
+# cv2.imshow("mask0",masks[:,:,0]*255)
+# cv2.waitKey(0)
+
 visualize.plot_nocs(coords,file_name)
 
 visualize.display_instances(image, rois, masks, class_ids, synset_names,file_name,scores)
@@ -182,15 +187,15 @@ plt.imshow(masks.sum(2))
 plt.savefig("output_images/mask_out.png")
 
 
-coord_gt = skimage.io.imread('images/0004_coord.png')
-coord_gt_y = coord_gt[:,:,1] 
+coord_gt = skimage.io.imread('images/0000_coord.png')
+coord_gt_y = coord_gt[:,:,2] 
 
 res_y = np.zeros((480,640))
 for i in range(len(coords)):
 
     cord = coords[i]
 
-    y_cord = cord[:,:,1]
+    y_cord = cord[:,:,2]
     res_y += y_cord
 
 plt.figure()

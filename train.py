@@ -95,6 +95,7 @@ class Nocs_train_config(Config):
 
     WEIGHT_DECAY = 0.0001
     LEARNING_RATE = 0.001
+    # LEARNING_RATE = 0.01
     LEARNING_MOMENTUM = 0.9
 
     COORD_LOSS_SCALE = 1
@@ -825,6 +826,10 @@ if __name__ == '__main__':
 
     model.load_state_dict(filtered_state_dict, strict=False)
 
+    # Load pretrained model for training
+    # model = modellib.MaskRCNN(config=config, model_dir=MODEL_DIR)
+    # model.load_state_dict(torch.load('models/nocs_train20230422T1839/mask_rcnn_nocs_train_0025.pth'))
+
     # # Update the log directory
     model.set_log_dir(COCO_MODEL_PATH)
 
@@ -853,29 +858,27 @@ if __name__ == '__main__':
     print("Training network heads")
     model.train_model(trainset, valset,
                 learning_rate=config.LEARNING_RATE,
-                epochs=10,
+                epochs=50,
                 layers='heads')
 
-    # Training - Stage 2
-    # Finetune layers from ResNet stage 4 and up
-    print("Training Resnet layer 4+")
-    model.train_model(trainset, valset,
-                learning_rate=config.LEARNING_RATE/10,
-                epochs=3,
-                layers='4+')
+    # # Training - Stage 2
+    # # Finetune layers from ResNet stage 4 and up
+    # print("Training Resnet layer 4+")
+    # model.train_model(trainset, valset,
+    #             learning_rate=config.LEARNING_RATE/10,
+    #             epochs=3,
+    #             layers='4+')
 
 
-    # model = modellib.MaskRCNN(config=config, model_dir=MODEL_DIR)
-    # model.to(device)
-    # model.load_state_dict(torch.load('models/nocs_train20230420T2339/mask_rcnn_nocs_train_0006.pth'))
+
     
-    # Training - Stage 3
-    # Finetune layers from ResNet stage 3 and up
-    print("Training Resnet layer 3+")
-    model.train_model(trainset, valset,
-                learning_rate=config.LEARNING_RATE/100,
-                epochs=70,
-                layers='all')
+    # # Training - Stage 3
+    # # Finetune layers from ResNet stage 3 and up
+    # print("Training Resnet layer 3+")
+    # model.train_model(trainset, valset,
+    #             learning_rate=config.LEARNING_RATE/100,
+    #             epochs=70,
+    #             layers='all')
     
 
 
