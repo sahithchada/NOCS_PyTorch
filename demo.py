@@ -174,10 +174,6 @@ r = results[0]
 
 rois, masks, class_ids, scores, coords = r['rois'], r['masks'], r['class_ids'], r['scores'],r['coords']
 
-# cv2.imshow("coord0",coords[0])
-# cv2.imshow("mask0",masks[:,:,0]*255)
-# cv2.waitKey(0)
-
 visualize.plot_nocs(coords,file_name)
 
 visualize.display_instances(image, rois, masks, class_ids, synset_names,file_name,scores)

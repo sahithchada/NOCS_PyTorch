@@ -257,6 +257,8 @@ if __name__ == '__main__':
 
     # 'models/nocs_train20230422T1839/mask_rcnn_nocs_train_0025.pth'
 
+
+    # Put train path none if training a new model
     model = model_loaded_weights(config,trained_path='models/nocs_train20230422T1839/mask_rcnn_nocs_train_0025.pth')
     # model = model_loaded_weights(config,trained_path=None)
         
@@ -264,7 +266,7 @@ if __name__ == '__main__':
     camera_dir = os.path.join('data', 'camera')
     # camera_dir = '../NOCS_CVPR2019/data/camera'
 
-    trainset = SyntheticData(synset_names,'val')
+    trainset = SyntheticData(synset_names,'train')
     trainset.load_camera_scenes(camera_dir)
     trainset.prepare(class_map)
 

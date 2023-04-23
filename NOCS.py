@@ -56,14 +56,8 @@ class CoordBinValues(nn.Module):
         self.coord_num_bins = coord_num_bins
 
     def forward(self, mrcnn_coord_bin):
-        mrcnn_coord_shape = mrcnn_coord_bin.shape
-        #mrcnn_coord_bin_reshape = mrcnn_coord_bin.view(-1, mrcnn_coord_shape[-1])
-        mrcnn_coord_bin_reshape = mrcnn_coord_bin.view(-1, mrcnn_coord_shape[2])
 
-        mrcnn_coord_bin_ind = torch.argmax(mrcnn_coord_bin_reshape, dim=-1)
-        mrcnn_coord_bin_value = mrcnn_coord_bin_ind.float() / self.coord_num_bins
-        #mrcnn_coord_bin_value = mrcnn_coord_bin_value.view(*mrcnn_coord_shape[0,2,3,4])
-        mrcnn_coord_bin_value = mrcnn_coord_bin_value.view(mrcnn_coord_shape[0], mrcnn_coord_shape[1], mrcnn_coord_shape[3], mrcnn_coord_shape[4])
+        mrcnn_coord_bin_value = mrcnn_coord_bin.argmax(dim = 2) / self.coord_num_bins
 
         return mrcnn_coord_bin_value
 
