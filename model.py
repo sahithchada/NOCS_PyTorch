@@ -25,14 +25,14 @@ from torch.autograd import Variable
 
 import utils
 import visualize
-from torchvision.ops import nms   
-from torchvision.ops import RoIAlign
-from torchvision.ops import roi_align
+from torchvision.ops import nms
 
+
+# For visualizing (debugging)
 import matplotlib.pyplot as plt
 import cv2
 
-
+# New imports
 from loss import compute_losses
 from NOCS import Nocs_head_bins_wt_unshared, CoordBinValues
 

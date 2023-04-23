@@ -28,6 +28,37 @@ def compute_losses(rpn_match, rpn_bbox, rpn_class_logits, rpn_pred_bbox, target_
 
     return [rpn_class_loss, rpn_bbox_loss, mrcnn_class_loss, mrcnn_bbox_loss, mrcnn_mask_loss,mrcnn_coord_bins_symmetry_loss]
 
+def nocs_map_rotation(positive_class_ids,positive_ix,target_coords,mask_shape):
+    positive_class_rotation_theta = torch.tensor([class_id_to_theta(x) for x in positive_class_ids], dtype=torch.float32)
+
+    positive_class_rotation_matrix = torch.stack([rotation_y_matrix(x) for x in positive_class_rotation_theta]).reshape(-1, 3, 3)
+    positive_class_rotation_matrix = positive_class_rotation_matrix.reshape(-1, 1, 1, 3, 3) # [num_pos_rois, 1, 1, 3, 3]
+
+    tiled_rotation_matrix = positive_class_rotation_matrix.repeat(1, mask_shape[2], mask_shape[3], 1, 1)
+    indices = torch.stack([positive_ix, positive_class_ids], dim=1)
+
+    if indices.is_cuda:
+        tiled_rotation_matrix = tiled_rotation_matrix.cuda()
+
+    y_true = target_coords[positive_ix] - 0.5
+
+
+    y_true = y_true.unsqueeze(4)
+
+    ## num_rotations = 6
+    rotated_y_true_1 = torch.matmul(tiled_rotation_matrix, y_true)
+    rotated_y_true_2 = torch.matmul(tiled_rotation_matrix, rotated_y_true_1)
+    rotated_y_true_3 = torch.matmul(tiled_rotation_matrix, rotated_y_true_2)
+    rotated_y_true_4 = torch.matmul(tiled_rotation_matrix, rotated_y_true_3)
+    rotated_y_true_5 = torch.matmul(tiled_rotation_matrix, rotated_y_true_4)
+
+    # Gather the coordinate maps and masks (predicted and true) that contribute to loss
+    # true coord map:[N', height, width, bins]
+    y_true_stack = torch.cat([y_true, rotated_y_true_1, rotated_y_true_2, rotated_y_true_3, rotated_y_true_4, rotated_y_true_5], dim=4)
+
+
+    return y_true_stack, indices
+
 def compute_mrcnn_coord_bins_symmetry_loss(target_masks, target_coords, target_class_ids, target_domain_labels, pred_coords):
     """Mask L2 loss for the coordinates head.
     target_masks: [batch, num_rois, height, width].
@@ -61,7 +92,6 @@ def compute_mrcnn_coord_bins_symmetry_loss(target_masks, target_coords, target_c
 
         # Reshape for simplicity. Merge first two dimensions into one.
 
-        # num_bins = 32
         num_bins = pred_coords.size(-2) 
 
         target_class_ids = target_class_ids.view(-1,)
@@ -71,51 +101,27 @@ def compute_mrcnn_coord_bins_symmetry_loss(target_masks, target_coords, target_c
 
         pred_shape = pred_coords.size()
         pred_coords_reshape = pred_coords.view(-1, pred_shape[1], pred_shape[2], pred_shape[3], num_bins, 3)
+
         # Permute predicted coords to [N, num_classes, height, width, 3, num_bins]
         pred_coords_trans = pred_coords_reshape.permute(0, 3, 1, 2, 5, 4)
 
-        # Only positive ROIs contribute to the loss. And only
-        # the class specific mask of each ROI.
+        # Only positive ROIs contribute to the loss. And only the class specific mask of each ROI.
         # Only ROIs from synthetic images have the ground truth coord map and therefore contribute to the loss.
         target_domain_labels = target_domain_labels.view(-1,)
         domain_ix = torch.eq(target_domain_labels, False)
         target_class_ids = torch.mul(target_class_ids, domain_ix.float())
 
-        #positive_ix = torch.nonzero(target_class_ids > 0)[:, 0]
         positive_ix = torch.nonzero(target_class_ids > 0, as_tuple=True)[0]
 
 
         def nonzero_positive_loss(target_masks, target_coords, pred_coords_trans, positive_ix):
             #positive_class_ids = torch.tensor(target_class_ids)[positive_ix].to(torch.int64)
             positive_class_ids = target_class_ids[positive_ix].to(torch.int64)
-            positive_class_rotation_theta = torch.tensor([class_id_to_theta(x) for x in positive_class_ids], dtype=torch.float32)
 
-            positive_class_rotation_matrix = torch.stack([rotation_y_matrix(x) for x in positive_class_rotation_theta]).reshape(-1, 3, 3)
-            positive_class_rotation_matrix = positive_class_rotation_matrix.reshape(-1, 1, 1, 3, 3) # [num_pos_rois, 1, 1, 3, 3]
-
-            tiled_rotation_matrix = positive_class_rotation_matrix.repeat(1, mask_shape[2], mask_shape[3], 1, 1)
-            indices = torch.stack([positive_ix, positive_class_ids], dim=1)
-
-            if indices.is_cuda:
-                tiled_rotation_matrix = tiled_rotation_matrix.cuda()
-
-            y_true = target_coords[positive_ix] - 0.5
-
-
-            y_true = y_true.unsqueeze(4)
-
-            ## num_rotations = 6
-            rotated_y_true_1 = torch.matmul(tiled_rotation_matrix, y_true)
-            rotated_y_true_2 = torch.matmul(tiled_rotation_matrix, rotated_y_true_1)
-            rotated_y_true_3 = torch.matmul(tiled_rotation_matrix, rotated_y_true_2)
-            rotated_y_true_4 = torch.matmul(tiled_rotation_matrix, rotated_y_true_3)
-            rotated_y_true_5 = torch.matmul(tiled_rotation_matrix, rotated_y_true_4)
-
-            # Gather the coordinate maps and masks (predicted and true) that contribute to loss
-            # true coord map:[N', height, width, bins]
-            y_true_stack = torch.cat([y_true, rotated_y_true_1, rotated_y_true_2, rotated_y_true_3, rotated_y_true_4, rotated_y_true_5], dim=4)
-
-            ## shape: [num_pos_rois, height, width, 3, 6]
+            y_true_stack , indices = nocs_map_rotation(positive_class_ids,positive_ix,target_coords,mask_shape)
+            ## shape: [num_pos_rois, height, width, 3, 6] 
+            
+            
             y_true_stack = y_true_stack.permute(0, 1, 2, 4, 3)## shape: [num_pos_rois, height, width, 6, 3]
             y_true_stack = y_true_stack + 0.5
 
