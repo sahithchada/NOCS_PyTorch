@@ -119,8 +119,8 @@ def compute_mrcnn_coord_bins_symmetry_loss(target_masks, target_coords, target_c
             y_true_stack = y_true_stack.permute(0, 1, 2, 4, 3)## shape: [num_pos_rois, height, width, 6, 3]
             y_true_stack = y_true_stack + 0.5
 
-            y_true_stack_numpy=y_true_stack.detach().cpu().numpy()
-            mask_numpy= target_masks.detach().cpu().numpy()
+            # y_true_stack_numpy=y_true_stack.detach().cpu().numpy()
+            # mask_numpy= target_masks.detach().cpu().numpy()
             # for i in range(y_true_stack.shape[0]):
             #     print(target_class_ids[i])
             #     cv2.imshow("mask",mask_numpy[i])

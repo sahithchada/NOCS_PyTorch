@@ -21,6 +21,11 @@ from PIL import Image
 from skimage.transform import resize
 import cv2
 
+import torch.nn as nn
+import torch.nn.functional as F
+from torch.autograd import Variable
+from torchvision.ops import RoIAlign
+
 ############################################################
 #  Bounding Boxes
 ############################################################
@@ -739,6 +744,150 @@ def rotate_and_crop_images(image, masks, coords, rotate_degree):
     else:
         return image_rotated_cropped, mask_rotated_cropped
 
+############################################################
+#  Torch Helpers
+############################################################
+
+def log2(x):
+    """Implementatin of Log2. Pytorch doesn't have a native implemenation."""
+    ln2 = Variable(torch.log(torch.FloatTensor([2.0])), requires_grad=False)
+    if x.is_cuda:
+        ln2 = ln2.cuda()
+    return torch.log(x + 1e-5) / ln2
+
+class SamePad2d(nn.Module):
+    """Mimics tensorflow's 'SAME' padding.
+    """
+
+    def __init__(self, kernel_size, stride):
+        super(SamePad2d, self).__init__()
+        self.kernel_size = torch.nn.modules.utils._pair(kernel_size)
+        self.stride = torch.nn.modules.utils._pair(stride)
+
+    def forward(self, input):
+        in_width = input.size()[2]
+        in_height = input.size()[3]
+        out_width = math.ceil(float(in_width) / float(self.stride[0]))
+        out_height = math.ceil(float(in_height) / float(self.stride[1]))
+        pad_along_width = ((out_width - 1) * self.stride[0] +
+                           self.kernel_size[0] - in_width)
+        pad_along_height = ((out_height - 1) * self.stride[1] +
+                            self.kernel_size[1] - in_height)
+        pad_left = math.floor(pad_along_width / 2)
+        pad_top = math.floor(pad_along_height / 2)
+        pad_right = pad_along_width - pad_left
+        pad_bottom = pad_along_height - pad_top
+        return F.pad(input, (pad_left, pad_right, pad_top, pad_bottom), 'constant', 0)
+
+    def __repr__(self):
+        return self.__class__.__name__
+    
+############################################################
+#  ROIAlign Layer
+############################################################
+
+def pyramid_roi_align(inputs, pool_size, image_shape):
+    """Implements ROI Pooling on multiple levels of the feature pyramid.
+
+    Params:
+    - pool_size: [height, width] of the output pooled regions. Usually [7, 7]
+    - image_shape: [height, width, channels]. Shape of input image in pixels
+
+    Inputs:
+    - boxes: [batch, num_boxes, (y1, x1, y2, x2)] in normalized
+             coordinates.
+    - Feature maps: List of feature maps from different levels of the pyramid.
+                    Each is [batch, channels, height, width]
+
+    Output:
+    Pooled regions in the shape: [num_boxes, height, width, channels].
+    The width and height are those specific in the pool_shape in the layer
+    constructor.
+    """
+
+    # Currently only supports batchsize 1
+    for i in range(len(inputs)):
+        inputs[i] = inputs[i].squeeze(0)
+
+    # Crop boxes [batch, num_boxes, (y1, x1, y2, x2)] in normalized coords
+    boxes = inputs[0]
+    # Feature Maps. List of feature maps from different level of the
+    # feature pyramid. Each is [batch, height, width, channels]
+    feature_maps = inputs[1:]
+    #print(feature_maps[3].shape)
+
+    # Assign each ROI to a level in the pyramid based on the ROI area.
+    y1, x1, y2, x2 = boxes.chunk(4, dim=1)
+    h = y2 - y1
+    w = x2 - x1
+
+    # Equation 1 in the Feature Pyramid Networks paper. Account for
+    # the fact that our coordinates are normalized here.
+    # e.g. a 224x224 ROI (in pixels) maps to P4
+    image_area = Variable(torch.FloatTensor([float(image_shape[0]*image_shape[1])]), requires_grad=False)
+    if boxes.is_cuda:
+        image_area = image_area.cuda()
+    roi_level = 4 + log2(torch.sqrt(h*w)/(224.0/torch.sqrt(image_area)))
+    roi_level = roi_level.round().int()
+    roi_level = roi_level.clamp(2,5)
+
+
+    # Loop through levels and apply ROI pooling to each. P2 to P5.
+    pooled = []
+    box_to_level = []
+    for i, level in enumerate(range(2, 6)):
+        ix  = roi_level==level
+        if not ix.any():
+            continue
+        ix = torch.nonzero(ix)[:,0]
+        level_boxes = boxes[ix.data, :]
+
+        # Keep track of which box is mapped to which level
+        box_to_level.append(ix.data)
+
+        # Stop gradient propogation to ROI proposals
+        level_boxes = level_boxes.detach()
+
+        # Crop and Resize
+        # From Mask R-CNN paper: "We sample four regular locations, so
+        # that we can evaluate either max or average pooling. In fact,
+        # interpolating only a single value at each bin center (without
+        # pooling) is nearly as effective."
+        #
+        # Here we use the simplified approach of a single value per bin,
+        # which is how it's done in tf.crop_and_resize()
+        # Result: [batch * num_boxes, pool_height, pool_width, channels]
+        ind = Variable(torch.zeros(level_boxes.size()[0]),requires_grad=False).int()
+        level_boxes = level_boxes[:, [1, 0, 3, 2]]
+        n,h,w=feature_maps[i].shape
+        level_boxes[:,[0, 2]]*= image_shape[0]
+        level_boxes[:,[1,3]]*=image_shape[1]
+        indexes = torch.zeros(level_boxes.shape[0], 1)
+        if level_boxes.is_cuda:
+            indexes = indexes.cuda()
+        level_boxes = torch.cat((indexes, level_boxes), dim=1)
+        if level_boxes.is_cuda:
+            ind = ind.cuda()
+
+        feature_maps_reshaped = torch.reshape(feature_maps[i], (1,n, h,w))
+
+        roi_align1 = RoIAlign((pool_size, pool_size), spatial_scale=feature_maps[i].shape[1]/image_shape[0],sampling_ratio=-1)
+
+        pooled_features=roi_align1(feature_maps_reshaped,level_boxes)
+        pooled.append(pooled_features)
+
+    # Pack pooled features into one tensor
+    pooled = torch.cat(pooled, dim=0)
+
+    # Pack box_to_level mapping into one array and add another
+    # column representing the order of pooled boxes
+    box_to_level = torch.cat(box_to_level, dim=0)
+
+    # Rearrange pooled features to match the order of the original boxes
+    _, box_to_level = torch.sort(box_to_level)
+    pooled = pooled[box_to_level, :, :]
+
+    return pooled
 
 
 

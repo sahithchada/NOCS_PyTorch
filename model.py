@@ -29,13 +29,12 @@ from torchvision.ops import nms
 from torchvision.ops import RoIAlign
 from torchvision.ops import roi_align
 
-import skimage.io
 import matplotlib.pyplot as plt
 import cv2
-import functools
-import operator
+
 
 from loss import compute_losses
+from NOCS import Nocs_head_bins_wt_unshared, CoordBinValues
 
 
 ############################################################
@@ -99,40 +98,27 @@ def intersect1d(tensor1, tensor2):
     aux = aux.sort()[0]
     return aux[:-1][(aux[1:] == aux[:-1]).data]
 
-def log2(x):
-    """Implementatin of Log2. Pytorch doesn't have a native implemenation."""
-    ln2 = Variable(torch.log(torch.FloatTensor([2.0])), requires_grad=False)
-    if x.is_cuda:
-        ln2 = ln2.cuda()
-    return torch.log(x + 1e-5) / ln2
+def crop_and_resize(image,boxes,box_indices,crop_size):
+    #[num_boxes, crop_height, crop_width, depth].
+    h,w = image.shape[1], image.shape[2]
+    result = torch.empty(boxes.shape[0],crop_size[0],crop_size[1],image.shape[-1])
 
-class SamePad2d(nn.Module):
-    """Mimics tensorflow's 'SAME' padding.
-    """
+    for i in range(boxes.shape[0]):
 
-    def __init__(self, kernel_size, stride):
-        super(SamePad2d, self).__init__()
-        self.kernel_size = torch.nn.modules.utils._pair(kernel_size)
-        self.stride = torch.nn.modules.utils._pair(stride)
+        box = boxes[i]
+        y1, x1, y2, x2 = box[0], box[1], box[2], box[3]
 
-    def forward(self, input):
-        in_width = input.size()[2]
-        in_height = input.size()[3]
-        out_width = math.ceil(float(in_width) / float(self.stride[0]))
-        out_height = math.ceil(float(in_height) / float(self.stride[1]))
-        pad_along_width = ((out_width - 1) * self.stride[0] +
-                           self.kernel_size[0] - in_width)
-        pad_along_height = ((out_height - 1) * self.stride[1] +
-                            self.kernel_size[1] - in_height)
-        pad_left = math.floor(pad_along_width / 2)
-        pad_top = math.floor(pad_along_height / 2)
-        pad_right = pad_along_width - pad_left
-        pad_bottom = pad_along_height - pad_top
-        return F.pad(input, (pad_left, pad_right, pad_top, pad_bottom), 'constant', 0)
+        y1 = torch.round(y1 * (h - 1)).int()
+        y2 = torch.round(y2 * (h - 1)).int()
+        x1 = torch.round(x1 * (w - 1)).int()
+        x2 = torch.round(x2 * (w - 1)).int()
 
-    def __repr__(self):
-        return self.__class__.__name__
+        crop = image[i:i+1,y1:y2+1,x1:x2+1]
 
+        resized_crop = torchvision.transforms.functional.resize(crop.permute(0,3,1,2),crop_size,antialias = True)
+        result[i] = resized_crop.permute(0,2,3,1)
+
+    return result
 
 ############################################################
 #  FPN Graph
@@ -142,7 +128,7 @@ class TopDownLayer(nn.Module):
     def __init__(self, in_channels, out_channels):
         super(TopDownLayer, self).__init__()
         self.conv1 = nn.Conv2d(in_channels, out_channels, kernel_size=1, stride=1)
-        self.padding2 = SamePad2d(kernel_size=3, stride=1)
+        self.padding2 = utils.SamePad2d(kernel_size=3, stride=1)
         self.conv2 = nn.Conv2d(out_channels, out_channels, kernel_size=3, stride=1)
 
     def forward(self, x, y):
@@ -162,22 +148,22 @@ class FPN(nn.Module):
         self.P6 = nn.MaxPool2d(kernel_size=1, stride=2)
         self.P5_conv1 = nn.Conv2d(2048, self.out_channels, kernel_size=1, stride=1)
         self.P5_conv2 = nn.Sequential(
-            SamePad2d(kernel_size=3, stride=1),
+            utils.SamePad2d(kernel_size=3, stride=1),
             nn.Conv2d(self.out_channels, self.out_channels, kernel_size=3, stride=1),
         )
         self.P4_conv1 =  nn.Conv2d(1024, self.out_channels, kernel_size=1, stride=1)
         self.P4_conv2 = nn.Sequential(
-            SamePad2d(kernel_size=3, stride=1),
+            utils.SamePad2d(kernel_size=3, stride=1),
             nn.Conv2d(self.out_channels, self.out_channels, kernel_size=3, stride=1),
         )
         self.P3_conv1 = nn.Conv2d(512, self.out_channels, kernel_size=1, stride=1)
         self.P3_conv2 = nn.Sequential(
-            SamePad2d(kernel_size=3, stride=1),
+            utils.SamePad2d(kernel_size=3, stride=1),
             nn.Conv2d(self.out_channels, self.out_channels, kernel_size=3, stride=1),
         )
         self.P2_conv1 = nn.Conv2d(256, self.out_channels, kernel_size=1, stride=1)
         self.P2_conv2 = nn.Sequential(
-            SamePad2d(kernel_size=3, stride=1),
+            utils.SamePad2d(kernel_size=3, stride=1),
             nn.Conv2d(self.out_channels, self.out_channels, kernel_size=3, stride=1),
         )
 
@@ -218,7 +204,7 @@ class Bottleneck(nn.Module):
         super(Bottleneck, self).__init__()
         self.conv1 = nn.Conv2d(inplanes, planes, kernel_size=1, stride=stride)
         self.bn1 = nn.BatchNorm2d(planes, eps=0.001, momentum=0.01)
-        self.padding2 = SamePad2d(kernel_size=3, stride=1)
+        self.padding2 = utils.SamePad2d(kernel_size=3, stride=1)
         self.conv2 = nn.Conv2d(planes, planes, kernel_size=3)
         self.bn2 = nn.BatchNorm2d(planes, eps=0.001, momentum=0.01)
         self.conv3 = nn.Conv2d(planes, planes * 4, kernel_size=1)
@@ -264,7 +250,7 @@ class ResNet(nn.Module):
             nn.Conv2d(3, 64, kernel_size=7, stride=2, padding=3),
             nn.BatchNorm2d(64, eps=0.001, momentum=0.01),
             nn.ReLU(inplace=True),
-            SamePad2d(kernel_size=3, stride=2),
+            utils.SamePad2d(kernel_size=3, stride=2),
             nn.MaxPool2d(kernel_size=3, stride=2),
         )
         self.C2 = self.make_layer(self.block, 64, self.layers[0])
@@ -411,115 +397,6 @@ def proposal_layer(inputs, proposal_count, nms_threshold, anchors, config=None):
     normalized_boxes = normalized_boxes.unsqueeze(0)
 
     return normalized_boxes
-
-
-############################################################
-#  ROIAlign Layer
-############################################################
-
-def pyramid_roi_align(inputs, pool_size, image_shape):
-    """Implements ROI Pooling on multiple levels of the feature pyramid.
-
-    Params:
-    - pool_size: [height, width] of the output pooled regions. Usually [7, 7]
-    - image_shape: [height, width, channels]. Shape of input image in pixels
-
-    Inputs:
-    - boxes: [batch, num_boxes, (y1, x1, y2, x2)] in normalized
-             coordinates.
-    - Feature maps: List of feature maps from different levels of the pyramid.
-                    Each is [batch, channels, height, width]
-
-    Output:
-    Pooled regions in the shape: [num_boxes, height, width, channels].
-    The width and height are those specific in the pool_shape in the layer
-    constructor.
-    """
-
-    # Currently only supports batchsize 1
-    for i in range(len(inputs)):
-        inputs[i] = inputs[i].squeeze(0)
-
-    # Crop boxes [batch, num_boxes, (y1, x1, y2, x2)] in normalized coords
-    boxes = inputs[0]
-    # Feature Maps. List of feature maps from different level of the
-    # feature pyramid. Each is [batch, height, width, channels]
-    feature_maps = inputs[1:]
-    #print(feature_maps[3].shape)
-
-    # Assign each ROI to a level in the pyramid based on the ROI area.
-    y1, x1, y2, x2 = boxes.chunk(4, dim=1)
-    h = y2 - y1
-    w = x2 - x1
-
-    # Equation 1 in the Feature Pyramid Networks paper. Account for
-    # the fact that our coordinates are normalized here.
-    # e.g. a 224x224 ROI (in pixels) maps to P4
-    image_area = Variable(torch.FloatTensor([float(image_shape[0]*image_shape[1])]), requires_grad=False)
-    if boxes.is_cuda:
-        image_area = image_area.cuda()
-    roi_level = 4 + log2(torch.sqrt(h*w)/(224.0/torch.sqrt(image_area)))
-    roi_level = roi_level.round().int()
-    roi_level = roi_level.clamp(2,5)
-
-
-    # Loop through levels and apply ROI pooling to each. P2 to P5.
-    pooled = []
-    box_to_level = []
-    for i, level in enumerate(range(2, 6)):
-        ix  = roi_level==level
-        if not ix.any():
-            continue
-        ix = torch.nonzero(ix)[:,0]
-        level_boxes = boxes[ix.data, :]
-
-        # Keep track of which box is mapped to which level
-        box_to_level.append(ix.data)
-
-        # Stop gradient propogation to ROI proposals
-        level_boxes = level_boxes.detach()
-
-        # Crop and Resize
-        # From Mask R-CNN paper: "We sample four regular locations, so
-        # that we can evaluate either max or average pooling. In fact,
-        # interpolating only a single value at each bin center (without
-        # pooling) is nearly as effective."
-        #
-        # Here we use the simplified approach of a single value per bin,
-        # which is how it's done in tf.crop_and_resize()
-        # Result: [batch * num_boxes, pool_height, pool_width, channels]
-        ind = Variable(torch.zeros(level_boxes.size()[0]),requires_grad=False).int()
-        level_boxes = level_boxes[:, [1, 0, 3, 2]]
-        n,h,w=feature_maps[i].shape
-        level_boxes[:,[0, 2]]*= image_shape[0]
-        level_boxes[:,[1,3]]*=image_shape[1]
-        indexes = torch.zeros(level_boxes.shape[0], 1)
-        if level_boxes.is_cuda:
-            indexes = indexes.cuda()
-        level_boxes = torch.cat((indexes, level_boxes), dim=1)
-        if level_boxes.is_cuda:
-            ind = ind.cuda()
-
-        feature_maps_reshaped = torch.reshape(feature_maps[i], (1,n, h,w))
-
-        roi_align1 = RoIAlign((pool_size, pool_size), spatial_scale=feature_maps[i].shape[1]/image_shape[0],sampling_ratio=-1)
-
-        pooled_features=roi_align1(feature_maps_reshaped,level_boxes)
-        pooled.append(pooled_features)
-
-    # Pack pooled features into one tensor
-    pooled = torch.cat(pooled, dim=0)
-
-    # Pack box_to_level mapping into one array and add another
-    # column representing the order of pooled boxes
-    box_to_level = torch.cat(box_to_level, dim=0)
-
-    # Rearrange pooled features to match the order of the original boxes
-    _, box_to_level = torch.sort(box_to_level)
-    pooled = pooled[box_to_level, :, :]
-
-    return pooled
-
 
 ############################################################
 #  Detection Target Layer
@@ -680,41 +557,9 @@ def detection_target_layer(proposals, gt_class_ids, gt_boxes, gt_masks,gt_coords
 
         box_ids = torch.arange(roi_masks.shape[0]).int()
 
-        torch._assert(roi_masks.shape == roi_coord_x.shape == roi_coord_y.shape == roi_coord_z.shape
-                      , 'coord_mask2')
+        torch._assert(roi_masks.shape == roi_coord_x.shape == roi_coord_y.shape == roi_coord_z.shape, 'coord_mask2')
         
-        def crop_and_resize(image,boxes,box_indices,crop_size):
-            #[num_boxes, crop_height, crop_width, depth].
-            h,w = image.shape[1], image.shape[2]
-            result = torch.empty(boxes.shape[0],crop_size[0],crop_size[1],image.shape[-1])
-
-            for i in range(boxes.shape[0]):
-
-                box = boxes[i]
-                y1, x1, y2, x2 = box[0], box[1], box[2], box[3]
-
-                y1 = torch.round(y1 * (h - 1)).int()
-                y2 = torch.round(y2 * (h - 1)).int()
-                x1 = torch.round(x1 * (w - 1)).int()
-                x2 = torch.round(x2 * (w - 1)).int()
-
-                crop = image[i:i+1,y1:y2+1,x1:x2+1]
-
-                resized_crop = torchvision.transforms.functional.resize(crop.permute(0,3,1,2),crop_size,antialias = True)
-                result[i] = resized_crop.permute(0,2,3,1)
-
-                # plt.figure()
-                # plt.subplot(2,1,1)
-                # plt.imshow(crop[0,:,:,0].detach().cpu())
-                # plt.subplot(2,1,2)
-                # plt.imshow(resized_crop.permute(0,2,3,1)[0,:,:,0].detach().cpu())
-                # plt.savefig('output_images/haha.png')
-
-            return result
-
-
-
-        # TODO: IMAGE CROP AND RESIZE
+        # IMAGE CROP AND RESIZE
         masks = crop_and_resize(roi_masks.to(torch.float32),boxes,box_ids,config.MASK_SHAPE)
         coord_x = crop_and_resize(roi_coord_x.to(torch.float32),boxes,box_ids,config.MASK_SHAPE)
         coord_y = crop_and_resize(roi_coord_y.to(torch.float32),boxes,box_ids,config.MASK_SHAPE)
@@ -923,7 +768,7 @@ class RPN(nn.Module):
         self.anchor_stride = anchor_stride
         self.depth = depth
 
-        self.padding = SamePad2d(kernel_size=3, stride=self.anchor_stride)
+        self.padding = utils.SamePad2d(kernel_size=3, stride=self.anchor_stride)
         self.conv_shared = nn.Conv2d(self.depth, 512, kernel_size=3, stride=self.anchor_stride)
         self.relu = nn.ReLU(inplace=True)
         self.conv_class = nn.Conv2d(512, 2 * anchors_per_location, kernel_size=1, stride=1)
@@ -980,7 +825,7 @@ class Classifier(nn.Module):
         self.linear_bbox = nn.Linear(1024, num_classes * 4)
 
     def forward(self, x, rois):
-        x = pyramid_roi_align([rois]+x, self.pool_size, self.image_shape)
+        x = utils.pyramid_roi_align([rois]+x, self.pool_size, self.image_shape)
         x = self.conv1(x)
         x = self.bn1(x)
         x = self.relu(x)
@@ -1004,7 +849,7 @@ class Mask(nn.Module):
         self.pool_size = pool_size
         self.image_shape = image_shape
         self.num_classes = num_classes
-        self.padding = SamePad2d(kernel_size=3, stride=1)
+        self.padding = utils.SamePad2d(kernel_size=3, stride=1)
         self.conv1 = nn.Conv2d(self.depth, 256, kernel_size=3, stride=1)
         self.bn1 = nn.BatchNorm2d(256, eps=0.001)
         self.conv2 = nn.Conv2d(256, 256, kernel_size=3, stride=1)
@@ -1019,7 +864,7 @@ class Mask(nn.Module):
         self.relu = nn.ReLU(inplace=True)
 
     def forward(self, x, rois):
-        x = pyramid_roi_align([rois] + x, self.pool_size, self.image_shape)
+        x = utils.pyramid_roi_align([rois] + x, self.pool_size, self.image_shape)
         x = self.conv1(self.padding(x))
         x = self.bn1(x)
         x = self.relu(x)
@@ -1039,59 +884,108 @@ class Mask(nn.Module):
 
         return x
     
-# add net_name
-#nocs head
-class Nocs_head_bins_wt_unshared(nn.Module):
-    def __init__(self,depth, pool_size,image_shape, num_classes, num_bins, net_name):
-        super(Nocs_head_bins_wt_unshared, self).__init__()
-        self.pool_size = pool_size
-        self.image_shape = image_shape
-        self.num_classes = num_classes
-        self.num_bins=num_bins
-        self.net_name=net_name
-        self.depth=depth
-
-        self.padding = SamePad2d(kernel_size=3, stride=1)
-        self.conv1 = nn.Conv2d(self.depth, 256, kernel_size=3, stride=1)
-        self.bn1 = nn.BatchNorm2d(256, eps=0.001)
-        self.conv2 = nn.Conv2d(256, 256, kernel_size=3, stride=1)
-        self.bn2 = nn.BatchNorm2d(256, eps=0.001)
-        self.conv3 = nn.Conv2d(256, 256, kernel_size=3, stride=1)
-        self.bn3 = nn.BatchNorm2d(256, eps=0.001)
-        self.conv4 = nn.Conv2d(256, 256, kernel_size=3, stride=1)
-        self.bn4 = nn.BatchNorm2d(256, eps=0.001)
-        self.deconv = nn.ConvTranspose2d(256, 256, kernel_size=2, stride=2)
-        self.conv5 = nn.Conv2d(256, self.num_bins * self.num_classes, kernel_size=1, stride=1)
-        self.sigmoid = nn.Sigmoid()
-        self.softmax = nn.Softmax(dim=2)
-        self.relu = nn.ReLU(inplace=True)
-
-    def forward(self, x, rois):
-        x = pyramid_roi_align([rois] + x, self.pool_size, self.image_shape)
-        x = self.conv1(self.padding(x))
-        x = self.bn1(x)
-        x = self.relu(x)
-        x = self.conv2(self.padding(x))
-        x = self.bn2(x)
-        x = self.relu(x)
-        x = self.conv3(self.padding(x))
-        x = self.bn3(x)
-        x = self.relu(x)
-        x = self.conv4(self.padding(x))
-        x = self.bn4(x)
-        x = self.relu(x)
-        x_feature = self.deconv(x)
-        x = self.relu(x_feature)
-        x = self.conv5(x)
-
-        x=x.view(x.shape[0], -1,self.num_bins, x.shape[2], x.shape[3])
-        x = self.softmax(x)
-
-        return x,x_feature
-
 ############################################################
 #  Data Generator
 ############################################################
+
+class Dataset(torch.utils.data.Dataset):
+    def __init__(self, dataset, config, augment=False):
+        """A generator that returns images and corresponding target class ids,
+            bounding box deltas, and masks.
+
+            dataset: The Dataset object to pick data from
+            config: The model config object
+            shuffle: If True, shuffles the samples before every epoch
+            augment: If True, applies image augmentation to images (currently only
+                     horizontal flips are supported)
+
+            Returns a Python generator. Upon calling next() on it, the
+            generator returns two lists, inputs and outputs. The containtes
+            of the lists differs depending on the received arguments:
+            inputs list:
+            - images: [batch, H, W, C]
+            - image_metas: [batch, size of image meta]
+            - rpn_match: [batch, N] Integer (1=positive anchor, -1=negative, 0=neutral)
+            - rpn_bbox: [batch, N, (dy, dx, log(dh), log(dw))] Anchor bbox deltas.
+            - gt_class_ids: [batch, MAX_GT_INSTANCES] Integer class IDs
+            - gt_boxes: [batch, MAX_GT_INSTANCES, (y1, x1, y2, x2)]
+            - gt_masks: [batch, height, width, MAX_GT_INSTANCES]. The height and width
+                        are those of the image unless use_mini_mask is True, in which
+                        case they are defined in MINI_MASK_SHAPE.
+
+            outputs list: Usually empty in regular training. But if detection_targets
+                is True then the outputs list contains target class_ids, bbox deltas,
+                and masks.
+            """
+        self.b = 0  # batch item index
+        self.image_index = -1
+        self.image_ids = np.copy(dataset.image_ids)
+        self.error_count = 0
+
+        self.dataset = dataset
+        self.config = config
+        self.augment = augment
+
+        # Anchors
+        # [anchor_count, (y1, x1, y2, x2)]
+        self.anchors = utils.generate_pyramid_anchors(config.RPN_ANCHOR_SCALES,
+                                                 config.RPN_ANCHOR_RATIOS,
+                                                 config.BACKBONE_SHAPES,
+                                                 config.BACKBONE_STRIDES,
+                                                 config.RPN_ANCHOR_STRIDE)
+
+    def __getitem__(self, image_index):
+        # Get GT bounding boxes and masks for image.
+        image_id = self.image_ids[image_index]
+
+        
+        image, image_metas, gt_boxes, gt_masks, gt_coords, gt_domain_label = \
+            load_image_gt(self.dataset, self.config, image_id, augment=self.augment,
+                          use_mini_mask=self.config.USE_MINI_MASK)
+        
+        # Skip images that have no instances. This can happen in cases
+        # where we train on a subset of classes and the image doesn't
+        # have any of the classes we care about.
+
+        if np.sum(gt_boxes) <= 0:
+            rpn_bbox = 0
+            rpn_match = 0
+            gt_class_ids = 0
+            return image, image_metas, rpn_match, rpn_bbox, gt_class_ids, gt_boxes, gt_masks, gt_coords, gt_domain_label
+
+        # RPN Targets
+        rpn_match, rpn_bbox = build_rpn_targets(image.shape, self.anchors, gt_boxes, self.config)
+
+        # If more instances than fits in the array, sub-sample from them.
+        if gt_boxes.shape[0] > self.config.MAX_GT_INSTANCES:
+            ids = np.random.choice(
+                np.arange(gt_boxes.shape[0]), self.config.MAX_GT_INSTANCES, replace=False)
+            gt_class_ids = gt_class_ids[ids]
+            gt_boxes = gt_boxes[ids]
+            gt_masks = gt_masks[:, :, ids]
+
+        # Add to batch
+        rpn_match = rpn_match[:, np.newaxis]
+        images = mold_image(image.astype(np.float32), self.config)
+        gt_class_ids = gt_boxes[:,-1]
+
+        # Convert
+        images = torch.from_numpy(images.transpose(2, 0, 1)).float()
+        image_metas = torch.from_numpy(image_metas)
+        rpn_match = torch.from_numpy(rpn_match)
+        rpn_bbox = torch.from_numpy(rpn_bbox).float()
+        gt_class_ids = torch.from_numpy(gt_class_ids)
+        gt_boxes = torch.from_numpy(gt_boxes).float()
+        gt_masks = torch.from_numpy(gt_masks.astype(int).transpose(2, 0, 1)).float()
+        gt_coords = torch.from_numpy(gt_coords)
+        # gt_domain_label = torch.from_numpy(gt_domain_label)
+
+
+        return images, image_metas, rpn_match, rpn_bbox, gt_class_ids, gt_boxes, gt_masks, gt_coords, gt_domain_label
+
+    def __len__(self):
+        return self.image_ids.shape[0]
+    
 
 def load_image_gt(dataset, config, image_id, augment=False,
                   use_mini_mask=False,load_scale = False):
@@ -1115,18 +1009,14 @@ def load_image_gt(dataset, config, image_id, augment=False,
         defined in MINI_MASK_SHAPE.
     """
 
+    # Load image and mask
     if augment and dataset.subset == 'train':
         image, mask, coord, class_ids, scales, domain_label = dataset.load_augment_data(image_id)
-        # image = dataset.load_image(image_id)
-        # mask, coord, class_ids, scales, domain_label = dataset.load_mask(image_id)
     else:
         image = dataset.load_image(image_id)
         mask, coord, class_ids, scales, domain_label = dataset.load_mask(image_id)
     
 
-    # Load image and mask
-    # image = dataset.load_image(image_id)
-    # mask, class_ids = dataset.load_mask(image_id)
     shape = image.shape
     image, window, scale, padding = utils.resize_image(
         image,
@@ -1136,12 +1026,6 @@ def load_image_gt(dataset, config, image_id, augment=False,
     mask = utils.resize_mask(mask, scale, padding)
     coord = utils.resize_mask(coord, scale, padding)
 
-
-    # Random horizontal flips.
-    # if augment:
-    #     if random.randint(0, 1):
-    #         image = np.fliplr(image)
-    #         mask = np.fliplr(mask)
 
     # Bounding boxes. Note that some boxes might be all zeros
     # if the corresponding mask got cropped out.
@@ -1380,131 +1264,9 @@ def build_rpn_targets(image_shape, anchors, gt_boxes, config):
 
     return rpn_match, rpn_bbox
 
-
-
-class Dataset(torch.utils.data.Dataset):
-    def __init__(self, dataset, config, augment=False):
-        """A generator that returns images and corresponding target class ids,
-            bounding box deltas, and masks.
-
-            dataset: The Dataset object to pick data from
-            config: The model config object
-            shuffle: If True, shuffles the samples before every epoch
-            augment: If True, applies image augmentation to images (currently only
-                     horizontal flips are supported)
-
-            Returns a Python generator. Upon calling next() on it, the
-            generator returns two lists, inputs and outputs. The containtes
-            of the lists differs depending on the received arguments:
-            inputs list:
-            - images: [batch, H, W, C]
-            - image_metas: [batch, size of image meta]
-            - rpn_match: [batch, N] Integer (1=positive anchor, -1=negative, 0=neutral)
-            - rpn_bbox: [batch, N, (dy, dx, log(dh), log(dw))] Anchor bbox deltas.
-            - gt_class_ids: [batch, MAX_GT_INSTANCES] Integer class IDs
-            - gt_boxes: [batch, MAX_GT_INSTANCES, (y1, x1, y2, x2)]
-            - gt_masks: [batch, height, width, MAX_GT_INSTANCES]. The height and width
-                        are those of the image unless use_mini_mask is True, in which
-                        case they are defined in MINI_MASK_SHAPE.
-
-            outputs list: Usually empty in regular training. But if detection_targets
-                is True then the outputs list contains target class_ids, bbox deltas,
-                and masks.
-            """
-        self.b = 0  # batch item index
-        self.image_index = -1
-        self.image_ids = np.copy(dataset.image_ids)
-        self.error_count = 0
-
-        self.dataset = dataset
-        self.config = config
-        self.augment = augment
-
-        # Anchors
-        # [anchor_count, (y1, x1, y2, x2)]
-        self.anchors = utils.generate_pyramid_anchors(config.RPN_ANCHOR_SCALES,
-                                                 config.RPN_ANCHOR_RATIOS,
-                                                 config.BACKBONE_SHAPES,
-                                                 config.BACKBONE_STRIDES,
-                                                 config.RPN_ANCHOR_STRIDE)
-
-    def __getitem__(self, image_index):
-        # Get GT bounding boxes and masks for image.
-        image_id = self.image_ids[image_index]
-        # image, image_metas, gt_class_ids, gt_boxes, gt_masks = \
-        #     load_image_gt(self.dataset, self.config, image_id, augment=self.augment,
-        #                   use_mini_mask=self.config.USE_MINI_MASK)
-        
-        image, image_metas, gt_boxes, gt_masks, gt_coords, gt_domain_label = \
-            load_image_gt(self.dataset, self.config, image_id, augment=self.augment,
-                          use_mini_mask=self.config.USE_MINI_MASK)
-        
-        # Skip images that have no instances. This can happen in cases
-        # where we train on a subset of classes and the image doesn't
-        # have any of the classes we care about.
-        # if not np.any(gt_class_ids > 0):
-        #     return None
-
-        if np.sum(gt_boxes) <= 0:
-            rpn_bbox = 0
-            rpn_match = 0
-            gt_class_ids = 0
-            return image, image_metas, rpn_match, rpn_bbox, gt_class_ids, gt_boxes, gt_masks, gt_coords, gt_domain_label
-
-        # RPN Targets
-        rpn_match, rpn_bbox = build_rpn_targets(image.shape, self.anchors, gt_boxes, self.config)
-
-        # If more instances than fits in the array, sub-sample from them.
-        if gt_boxes.shape[0] > self.config.MAX_GT_INSTANCES:
-            ids = np.random.choice(
-                np.arange(gt_boxes.shape[0]), self.config.MAX_GT_INSTANCES, replace=False)
-            gt_class_ids = gt_class_ids[ids]
-            gt_boxes = gt_boxes[ids]
-            gt_masks = gt_masks[:, :, ids]
-
-        # Add to batch
-        rpn_match = rpn_match[:, np.newaxis]
-        images = mold_image(image.astype(np.float32), self.config)
-        gt_class_ids = gt_boxes[:,-1]
-
-        # Convert
-        images = torch.from_numpy(images.transpose(2, 0, 1)).float()
-        image_metas = torch.from_numpy(image_metas)
-        rpn_match = torch.from_numpy(rpn_match)
-        rpn_bbox = torch.from_numpy(rpn_bbox).float()
-        gt_class_ids = torch.from_numpy(gt_class_ids)
-        gt_boxes = torch.from_numpy(gt_boxes).float()
-        gt_masks = torch.from_numpy(gt_masks.astype(int).transpose(2, 0, 1)).float()
-        gt_coords = torch.from_numpy(gt_coords)
-        # gt_domain_label = torch.from_numpy(gt_domain_label)
-
-
-        return images, image_metas, rpn_match, rpn_bbox, gt_class_ids, gt_boxes, gt_masks, gt_coords, gt_domain_label
-
-    def __len__(self):
-        return self.image_ids.shape[0]
-
-
 ############################################################
 #  MaskRCNN Class
 ############################################################
-
-class CoordBinValues(nn.Module):
-    def __init__(self, coord_num_bins):
-        super(CoordBinValues, self).__init__()
-        self.coord_num_bins = coord_num_bins
-
-    def forward(self, mrcnn_coord_bin):
-        mrcnn_coord_shape = mrcnn_coord_bin.shape
-        #mrcnn_coord_bin_reshape = mrcnn_coord_bin.view(-1, mrcnn_coord_shape[-1])
-        mrcnn_coord_bin_reshape = mrcnn_coord_bin.view(-1, mrcnn_coord_shape[2])
-
-        mrcnn_coord_bin_ind = torch.argmax(mrcnn_coord_bin_reshape, dim=-1)
-        mrcnn_coord_bin_value = mrcnn_coord_bin_ind.float() / self.coord_num_bins
-        #mrcnn_coord_bin_value = mrcnn_coord_bin_value.view(*mrcnn_coord_shape[0,2,3,4])
-        mrcnn_coord_bin_value = mrcnn_coord_bin_value.view(mrcnn_coord_shape[0], mrcnn_coord_shape[1], mrcnn_coord_shape[3], mrcnn_coord_shape[4])
-
-        return mrcnn_coord_bin_value
 
 class MaskRCNN(nn.Module):
     """Encapsulates the Mask RCNN model functionality.
@@ -1871,43 +1633,6 @@ class MaskRCNN(nn.Module):
             target_coords = torch.stack([target_coord_x, target_coord_y, target_coord_z])
 
 
-
-            def see_coords(h,w,boxes,image_metas,coords):
-
-                _, _, window, _ = parse_image_meta(image_metas)
-                window = window.flatten()
-                # Compute scale and shift to translate coordinates to image domain.
-                h_scale = h / (window[2] - window[0])
-                w_scale = w / (window[3] - window[1])
-                scale = min(h_scale, w_scale)
-                shift = window[:2]  # y, x
-                scales = np.array([scale, scale, scale, scale])
-                shifts = np.array([shift[0], shift[1], shift[0], shift[1]])
-
-                # Translate bounding boxes to image domain
-                boxes = np.multiply(boxes - shifts, scales).astype(np.int32)
-
-                # Filter out detections with zero area. Often only happens in early
-                # stages of training when the network weights are still a bit random.
-                exclude_ix = np.where(
-                    (boxes[:, 2] - boxes[:, 0]) * (boxes[:, 3] - boxes[:, 1]) <= 0)[0]
-                if exclude_ix.shape[0] > 0:
-                    boxes = np.delete(boxes, exclude_ix, axis=0)
-                    coords = np.delete(coords, exclude_ix, axis=0)
-                    N = boxes.shape[0]
-
-
-                N = boxes.shape[0]
-                if N > 0:
-
-                    for i in range(N):
-
-                        full_coord = utils.unmold_coord(coords[i], boxes[i], (h,w))
-                        # plt.figure()
-                        # plt.imshow(full_coord)
-                        # plt.savefig('output_images/fullcoord.png')
-
-
             if not rois.size()[0]:
                 mrcnn_class_logits = Variable(torch.FloatTensor())
                 mrcnn_class = Variable(torch.IntTensor())
@@ -2036,7 +1761,6 @@ class MaskRCNN(nn.Module):
         self.epoch = epochs
 
 
-
     def train_epoch(self, datagenerator, optimizer, steps):
         batch_count = 0
         loss_sum = 0
@@ -2083,10 +1807,7 @@ class MaskRCNN(nn.Module):
 
             # Run object detection
             rpn_class_logits, rpn_pred_bbox, target_class_ids, mrcnn_class_logits, target_deltas,target_coords,mrcnn_bbox, target_mask, mrcnn_mask, pred_coords,mrcnn_coords_bin = \
-                self.predict([images, image_metas, gt_class_ids, gt_boxes, gt_masks,gt_coords,gt_domain_label], mode='training')
-            
-            
-
+                self.predict([images, image_metas, gt_class_ids, gt_boxes, gt_masks,gt_coords,gt_domain_label], mode='training')       
 
             target_domain_labels = torch.tile(gt_domain_label, (1, target_class_ids.shape[0]))
 
@@ -2208,13 +1929,6 @@ class MaskRCNN(nn.Module):
                                 #  mrcnn_mask_loss.data.cpu()[0]), length=10)
 
             # Statistics
-            # loss_sum += loss.data.cpu()[0]/steps
-            # loss_rpn_class_sum += rpn_class_loss.data.cpu()[0]/steps
-            # loss_rpn_bbox_sum += rpn_bbox_loss.data.cpu()[0]/steps
-            # loss_mrcnn_class_sum += mrcnn_class_loss.data.cpu()[0]/steps
-            # loss_mrcnn_bbox_sum += mrcnn_bbox_loss.data.cpu()[0]/steps
-            # loss_mrcnn_mask_sum += mrcnn_mask_loss.data.cpu()[0]/steps
-
             loss_sum += loss.item()/steps
             loss_rpn_class_sum += rpn_class_loss.item()/steps
             loss_rpn_bbox_sum += rpn_bbox_loss.item()/steps
