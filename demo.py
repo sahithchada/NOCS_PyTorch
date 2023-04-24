@@ -30,13 +30,15 @@ MODEL_DIR = os.path.join(ROOT_DIR, "logs")
 # project (See README file for details)
 
 COCO_MODEL_PATH = os.path.join(ROOT_DIR, "models/mask_rcnn_coco.pth")
-TRAINED_PATH = 'models/nocs_train20230422T1839/mask_rcnn_nocs_train_0025.pth'
+# TRAINED_PATH = 'models\mask_rcnn_nocs_train_0010.pth'
+TRAINED_PATH = 'models/nocs_train20230422T1230/mask_rcnn_nocs_train_0025.pth'
 
 # Directory of images to run detection on
 IMAGE_DIR = os.path.join(ROOT_DIR, "images")
 
 
 # Path to specific image
+# IMAGE_SPECIFIC = 'images/0000_color.png'
 IMAGE_SPECIFIC = None
 
 class InferenceConfig(coco.CocoConfig):
@@ -91,7 +93,7 @@ for coco_cls in class_map:
     coco_cls_ids.append(ind)
 config.display()
 
-model = model_loaded_weights(config,ineference=True,trained_path=TRAINED_PATH)
+model = model_loaded_weights(config,inference=True,trained_path=TRAINED_PATH)
 
 
 def run_model(model,fl_path = None ):
@@ -123,13 +125,13 @@ def run_model(model,fl_path = None ):
 
     rois, masks, class_ids, scores, coords = r['rois'], r['masks'], r['class_ids'], r['scores'],r['coords']
 
-    visualize.plot_nocs(coords,file_name)
+    visualize.plot_nocs(coords,masks,file_name)
 
     visualize.display_instances(image, rois, masks, class_ids, synset_names,file_name,scores)
 
 
 
-run_model(model,fl_path="data/real/test/0010_color.png")
+run_model(model,fl_path=IMAGE_SPECIFIC)
 
 # coord_gt = skimage.io.imread('images/0000_coord.png')
 # coord_gt_y = coord_gt[:,:,2] 

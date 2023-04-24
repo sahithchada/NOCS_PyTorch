@@ -70,7 +70,6 @@ class Nocs_train_config(Config):
 
     # Number of classes (including background)
     NUM_CLASSES = 1 + 6  # background + 6 object categories
-    # NUM_CLASSES = 1 + 80  # background + 6 object categories
     MEAN_PIXEL = np.array([[ 120.66209412, 114.70348358, 105.81269836]])
 
     IMAGE_MIN_DIM = 480
@@ -109,7 +108,7 @@ class Nocs_train_config(Config):
 
     USE_MINI_MASK = False
 
-def model_loaded_weights(config,ineference = None,trained_path = None):
+def model_loaded_weights(config,inference = None,trained_path = None):
     
     model = modellib.MaskRCNN(config=config, model_dir=MODEL_DIR)
 
@@ -132,14 +131,14 @@ def model_loaded_weights(config,ineference = None,trained_path = None):
         mismatches = ["classifier.linear_class.weight","classifier.linear_class.bias","classifier.linear_bbox.weight","classifier.linear_bbox.bias","mask.conv5.weight","mask.conv5.bias"]
 
 
-        """     
-        classifier.linear_class.weight: og: ([81, 1024]) changed: torch.Size([7, 1024]).
-        classifier.linear_class.bias: og: torch.Size([81]) changed: torch.Size([7]).
-        classifier.linear_bbox.weight: og: torch.Size([324, 1024]) changed: torch.Size([28, 1024]).
-        classifier.linear_bbox.bias: og: torch.Size([324]) changed: torch.Size([28]).
-        mask.conv5.weight: og: torch.Size([81, 256, 1, 1]) changed: torch.Size([7, 256, 1, 1]).
-        mask.conv5.bias: og: torch.Size([81]) changed: torch.Size([7]). 
-        """
+        # """     
+        # classifier.linear_class.weight: og: ([81, 1024]) changed: torch.Size([7, 1024]).
+        # classifier.linear_class.bias: og: torch.Size([81]) changed: torch.Size([7]).
+        # classifier.linear_bbox.weight: og: torch.Size([324, 1024]) changed: torch.Size([28, 1024]).
+        # classifier.linear_bbox.bias: og: torch.Size([324]) changed: torch.Size([28]).
+        # mask.conv5.weight: og: torch.Size([81, 256, 1, 1]) changed: torch.Size([7, 256, 1, 1]).
+        # mask.conv5.bias: og: torch.Size([81]) changed: torch.Size([7]). 
+        # """
 
         for i in range(len(mismatches)):
 
@@ -183,7 +182,7 @@ def model_loaded_weights(config,ineference = None,trained_path = None):
 
         model.load_state_dict(filtered_state_dict, strict=False)
 
-    if ineference:
+    if inference:
         pass
     else:
         # # Update the log directory

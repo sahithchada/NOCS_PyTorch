@@ -77,17 +77,6 @@ def compute_mrcnn_coord_bins_symmetry_loss(target_masks, target_coords, target_c
         target_coords=torch.permute(target_coords,(1,2,3,0))
         pred_coords=torch.permute(pred_coords,(1,4,5,2,3,0))
 
-        # mask_numpy= target_masks.detach().cpu().numpy()
-        # coord_numpy=target_coords.detach().cpu().numpy()
-        # for i in range(target_masks.shape[0]):
-        #     print(target_class_ids[i])
-        #     cv2.imshow("coords_x",coord_numpy[i,:,:,0])
-        #     cv2.imshow("coords_y",coord_numpy[i,:,:,1])
-        #     cv2.imshow("coords_z",coord_numpy[i,:,:,2])
-        #     cv2.imshow("mask",mask_numpy[i])
-        #     cv2.imshow("coords_all",coord_numpy[i])
-        #     cv2.waitKey(0)
-
         target_masks=torch.unsqueeze(target_masks, 0)
 
         # Reshape for simplicity. Merge first two dimensions into one.

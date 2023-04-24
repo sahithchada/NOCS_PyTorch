@@ -1346,6 +1346,7 @@ class MaskRCNN(nn.Module):
             if isinstance(m, nn.Conv2d):
                 #nn.init.xavier_uniform(m.weight)
                 nn.init.xavier_uniform_(m.weight)
+                # nn.init.kaiming_normal_(m.weight,nonlinearity='relu')
                 if m.bias is not None:
                     m.bias.data.zero_()
             elif isinstance(m, nn.BatchNorm2d):
@@ -1353,6 +1354,7 @@ class MaskRCNN(nn.Module):
                 m.bias.data.zero_()
             elif isinstance(m, nn.Linear):
                 m.weight.data.normal_(0, 0.01)
+                # nn.init.xavier_uniform_(m.weight)
                 m.bias.data.zero_()
 
     def set_trainable(self, layer_regex, model=None, indent=0, verbose=1):
@@ -1670,8 +1672,6 @@ class MaskRCNN(nn.Module):
 
 
             pred_coords = torch.vstack([mrcnn_coord_x_bin_value,mrcnn_coord_y_bin_value,mrcnn_coord_z_bin_value])
-            # pred_ids = mrcnn_class_logits.argmax(dim=1)
-
 
             # res_pred = torch.empty(3,pred_coords.shape[1],pred_coords.shape[-2],pred_coords.shape[-1])
             # for i in range(pred_coords.shape[-2]):
