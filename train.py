@@ -109,7 +109,7 @@ class Nocs_train_config(Config):
 
     USE_MINI_MASK = False
 
-def model_loaded_weights(config,trained_path = None):
+def model_loaded_weights(config,ineference = None,trained_path = None):
     
     model = modellib.MaskRCNN(config=config, model_dir=MODEL_DIR)
 
@@ -183,8 +183,11 @@ def model_loaded_weights(config,trained_path = None):
 
         model.load_state_dict(filtered_state_dict, strict=False)
 
-    # # Update the log directory
-    model.set_log_dir(COCO_MODEL_PATH)
+    if ineference:
+        pass
+    else:
+        # # Update the log directory
+        model.set_log_dir(COCO_MODEL_PATH)
 
     if config.GPU_COUNT > 0:
         device = torch.device('cuda')
@@ -259,8 +262,8 @@ if __name__ == '__main__':
 
 
     # Put train path none if training a new model
-    model = model_loaded_weights(config,trained_path='models/nocs_train20230422T1839/mask_rcnn_nocs_train_0025.pth')
-    # model = model_loaded_weights(config,trained_path=None)
+    # model = model_loaded_weights(config,trained_path='models/nocs_train20230422T1839/mask_rcnn_nocs_train_0025.pth')
+    model = model_loaded_weights(config,trained_path=None)
         
 
     camera_dir = os.path.join('data', 'camera')

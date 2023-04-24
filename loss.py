@@ -18,12 +18,12 @@ def compute_losses(rpn_match, rpn_bbox, rpn_class_logits, rpn_pred_bbox, target_
     mrcnn_mask_loss = compute_mrcnn_mask_loss(target_mask, target_class_ids, mrcnn_mask)
     mrcnn_coord_bins_symmetry_loss=compute_mrcnn_coord_bins_symmetry_loss(target_mask, target_coords, target_class_ids, target_domain_labels, pred_coords)
 
-    # target_mask_np = target_mask.detach().cpu().numpy()
-    # target_coords_np = target_coords.detach().cpu().numpy()
-    # target_class_ids_np = target_class_ids.detach().cpu().numpy()
-    # target_domain_labels_np = target_domain_labels.detach().cpu().numpy()
-    # pred_coords_np = pred_coords.detach().cpu().numpy()
-    # np.savez('loss_inputs.npz', target_mask_np = target_mask_np , target_coords_np=target_coords_np, target_class_ids_np = target_class_ids_np, target_domain_labels_np = target_domain_labels_np, pred_coords_np = pred_coords_np)
+    target_mask_np = target_mask.detach().cpu().numpy()
+    target_coords_np = target_coords.detach().cpu().numpy()
+    target_class_ids_np = target_class_ids.detach().cpu().numpy()
+    target_domain_labels_np = target_domain_labels.detach().cpu().numpy()
+    pred_coords_np = pred_coords.detach().cpu().numpy()
+    np.savez('loss_inputs.npz', target_mask_np = target_mask_np , target_coords_np=target_coords_np, target_class_ids_np = target_class_ids_np, target_domain_labels_np = target_domain_labels_np, pred_coords_np = pred_coords_np)
 
 
     return [rpn_class_loss, rpn_bbox_loss, mrcnn_class_loss, mrcnn_bbox_loss, mrcnn_mask_loss,mrcnn_coord_bins_symmetry_loss]
@@ -125,18 +125,6 @@ def compute_mrcnn_coord_bins_symmetry_loss(target_masks, target_coords, target_c
             y_true_stack = y_true_stack.permute(0, 1, 2, 4, 3)## shape: [num_pos_rois, height, width, 6, 3]
             y_true_stack = y_true_stack + 0.5
 
-            # y_true_stack_numpy=y_true_stack.detach().cpu().numpy()
-            # mask_numpy= target_masks.detach().cpu().numpy()
-            # for i in range(y_true_stack.shape[0]):
-            #     print(target_class_ids[i])
-            #     cv2.imshow("mask",mask_numpy[i])
-            #     for j in range(y_true_stack_numpy.shape[3]):
-            #         squeezed=y_true_stack_numpy[i,:,:,j,:]
-
-            #         cv2.imshow("coords"+str(j),squeezed)
-
-            #     cv2.waitKey(0)
-
             y_true_bins_stack = y_true_stack * float(num_bins) - 1e-6
             y_true_bins_stack = torch.floor(y_true_bins_stack)
             y_true_bins_stack = y_true_bins_stack.to(torch.int64)
@@ -187,7 +175,6 @@ def compute_mrcnn_coord_bins_symmetry_loss(target_masks, target_coords, target_c
             loss = loss.cuda()
     
     return loss   
-
 
 
 def compute_rpn_class_loss(rpn_match, rpn_class_logits):

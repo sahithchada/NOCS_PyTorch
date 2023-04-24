@@ -1670,16 +1670,16 @@ class MaskRCNN(nn.Module):
 
 
             pred_coords = torch.vstack([mrcnn_coord_x_bin_value,mrcnn_coord_y_bin_value,mrcnn_coord_z_bin_value])
-            pred_ids = mrcnn_class_logits.argmax(dim=1)
+            # pred_ids = mrcnn_class_logits.argmax(dim=1)
 
 
-            res_pred = torch.empty(3,pred_coords.shape[1],pred_coords.shape[-2],pred_coords.shape[-1])
-            for i in range(pred_coords.shape[-2]):
-                cls = target_class_ids[i]
-                temp = pred_coords[:,i,cls]
-                res_pred[:,i] = temp
+            # res_pred = torch.empty(3,pred_coords.shape[1],pred_coords.shape[-2],pred_coords.shape[-1])
+            # for i in range(pred_coords.shape[-2]):
+            #     cls = target_class_ids[i]
+            #     temp = pred_coords[:,i,cls]
+            #     res_pred[:,i] = temp
 
-            pred_coords = res_pred
+            # pred_coords = res_pred
                 
             mrcnn_coords_bin=torch.stack((mrcnn_coord_x_bin,mrcnn_coord_y_bin,mrcnn_coord_z_bin))
 
@@ -1808,24 +1808,24 @@ class MaskRCNN(nn.Module):
             rpn_class_logits, rpn_pred_bbox, target_class_ids, mrcnn_class_logits, target_deltas,target_coords,mrcnn_bbox, target_mask, mrcnn_mask, pred_coords,mrcnn_coords_bin = \
                 self.predict([images, image_metas, gt_class_ids, gt_boxes, gt_masks,gt_coords,gt_domain_label], mode='training')
             
-            plt.figure()
-            for i in range(32):
+            # plt.figure()
+            # for i in range(32):
 
-                targ_coord = target_coords[:,i].permute(1,2,0)
-                plt.subplot(8,4,i+1)
-                plt.imshow(targ_coord.detach().cpu().numpy())
+            #     targ_coord = target_coords[:,i].permute(1,2,0)
+            #     plt.subplot(8,4,i+1)
+            #     plt.imshow(targ_coord.detach().cpu().numpy())
             
-            plt.savefig('output_images/targ_coords')
+            # plt.savefig('output_images/targ_coords')
 
             
-            plt.figure()
-            for i in range(32):
+            # plt.figure()
+            # for i in range(32):
 
-                pred_coord = pred_coords[:,i].permute(1,2,0)
-                plt.subplot(8,4,i+1)
-                plt.imshow(pred_coord.detach().cpu().numpy())
+            #     pred_coord = pred_coords[:,i].permute(1,2,0)
+            #     plt.subplot(8,4,i+1)
+            #     plt.imshow(pred_coord.detach().cpu().numpy())
             
-            plt.savefig('output_images/pred_coords')
+            # plt.savefig('output_images/pred_coords')
 
 
             target_domain_labels = torch.tile(gt_domain_label, (1, target_class_ids.shape[0]))
