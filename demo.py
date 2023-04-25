@@ -14,6 +14,7 @@ import visualize
 
 import torch
 import cv2
+from dataset import SyntheticData
 
 from train import model_loaded_weights
 
@@ -128,25 +129,24 @@ def run_model(model,fl_path = None ):
     visualize.plot_nocs(coords,masks,file_name)
 
     visualize.display_instances(image, rois, masks, class_ids, synset_names,file_name,scores)
+    return r
 
 
 
-run_model(model,fl_path=IMAGE_SPECIFIC)
+r=run_model(model,fl_path=IMAGE_SPECIFIC)
 
-# coord_gt = skimage.io.imread('images/0000_coord.png')
-# coord_gt_y = coord_gt[:,:,2] 
+dataset = SyntheticData(synset_names,'train')
+dataset.load_camera_scenes(camera_dir)
+dataset.prepare(class_map)
+image = dataset.load_image(image_id)
 
-# res_y = np.zeros((480,640))
-# for i in range(len(coords)):
-
-#     cord = coords[i]
-
-#     y_cord = cord[:,:,2]
-#     res_y += y_cord
-
-# plt.figure()
-# plt.subplot(2,1,1)
-# plt.imshow(res_y)
-# plt.subplot(2,1,2)
-# plt.imshow(coord_gt_y)
-# plt.savefig("output_images/y_coord.png")
+intrinsics = np.array([[577.5, 0, 319.5], [0., 577.5, 239.5], [0., 0., 1.]]) #for camera data
+result = {}
+umeyama=True
+if umeyama:
+    result['pred_RTs'], result['pred_scales'], error_message, elapses =  utils.align(r['class_ids'], 
+                                                                                        r['masks'], 
+                                                                                        r['coords'], 
+                                                                                        depth, 
+                                                                                        intrinsics, 
+                                                                                        synset_names,  image_path)

@@ -114,7 +114,42 @@ def compute_mrcnn_coord_bins_symmetry_loss(target_masks, target_coords, target_c
             y_true_stack = y_true_stack.permute(0, 1, 2, 4, 3)## shape: [num_pos_rois, height, width, 6, 3]
             y_true_stack = y_true_stack + 0.5
 
-            y_true_bins_stack = y_true_stack * float(num_bins) - 1e-6
+            # y_true_stack_numpy=y_true_stack.detach().cpu().numpy()
+            # mask_numpy= target_masks.detach().cpu().numpy()
+            # for i in range(y_true_stack.shape[0]):
+            #     print(target_class_ids[i])
+            #     cv2.imshow("mask",mask_numpy[i])
+            #     for j in range(y_true_stack_numpy.shape[3]):
+            #         squeezedx=y_true_stack_numpy[i,:,:,j,0]
+            #         squeezedy=y_true_stack_numpy[i,:,:,j,1]
+            #         squeezedz=y_true_stack_numpy[i,:,:,j,2]
+
+            #         cv2.imshow("coords_x"+str(j),squeezedx)
+            #         cv2.imshow("coords_y"+str(j),squeezedy)
+            #         cv2.imshow("coords_z"+str(j),squeezedz)
+
+            #     cv2.waitKey(0)
+            target_mask_positive_index=target_masks[:y_true_stack.shape[0],:]
+            expanded_mask=target_mask_positive_index.unsqueeze(-1).unsqueeze(-1).expand_as(y_true_stack)
+            masked_y_true_stack=expanded_mask*y_true_stack
+
+            # y_true_stack_numpy=masked_y_true_stack.detach().cpu().numpy()
+            # mask_numpy= target_masks.detach().cpu().numpy()
+            # for i in range(y_true_stack.shape[0]):
+            #     print(target_class_ids[i])
+            #     cv2.imshow("mask",mask_numpy[i])
+            #     for j in range(y_true_stack_numpy.shape[3]):
+            #         squeezedx=y_true_stack_numpy[i,:,:,j,0]
+            #         squeezedy=y_true_stack_numpy[i,:,:,j,1]
+            #         squeezedz=y_true_stack_numpy[i,:,:,j,2]
+
+            #         cv2.imshow("coords_x"+str(j),squeezedx)
+            #         cv2.imshow("coords_y"+str(j),squeezedy)
+            #         cv2.imshow("coords_z"+str(j),squeezedz)
+
+            #     cv2.waitKey(0)
+
+            y_true_bins_stack = masked_y_true_stack * float(num_bins) - 1e-6
             y_true_bins_stack = torch.floor(y_true_bins_stack)
             y_true_bins_stack = y_true_bins_stack.to(torch.int64)
 

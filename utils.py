@@ -25,6 +25,9 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch.autograd import Variable
 from torchvision.ops import RoIAlign
+import time
+
+from aligning import estimateSimilarityTransform
 
 ############################################################
 #  Bounding Boxes
@@ -890,4 +893,111 @@ def pyramid_roi_align(inputs, pool_size, image_shape):
     return pooled
 
 
+def backproject(depth, intrinsics, instance_mask):
+    intrinsics_inv = np.linalg.inv(intrinsics)
+    image_shape = depth.shape
+    width = image_shape[1]
+    height = image_shape[0]
 
+    x = np.arange(width)
+    y = np.arange(height)
+
+    #non_zero_mask = np.logical_and(depth > 0, depth < 5000)
+    non_zero_mask = (depth > 0)
+    final_instance_mask = np.logical_and(instance_mask, non_zero_mask)
+    
+    idxs = np.where(final_instance_mask)
+    grid = np.array([idxs[1], idxs[0]])
+
+    # shape: height * width
+    # mesh_grid = np.meshgrid(x, y) #[height, width, 2]
+    # mesh_grid = np.reshape(mesh_grid, [2, -1])
+    length = grid.shape[1]
+    ones = np.ones([1, length])
+    uv_grid = np.concatenate((grid, ones), axis=0) # [3, num_pixel]
+
+    xyz = intrinsics_inv @ uv_grid # [3, num_pixel]
+    xyz = np.transpose(xyz) #[num_pixel, 3]
+
+    z = depth[idxs[0], idxs[1]]
+
+    # print(np.amax(z), np.amin(z))
+    pts = xyz * z[:, np.newaxis]/xyz[:, -1:]
+    pts[:, 0] = -pts[:, 0]
+    pts[:, 1] = -pts[:, 1]
+
+    return pts, idxs
+
+def align(class_ids, masks, coords, depth, intrinsics, synset_names, image_path, save_path=None, if_norm=False, with_scale=True, verbose=False):
+    num_instances = len(class_ids)
+    error_messages = ''
+    elapses = []
+    if num_instances == 0:
+        return np.zeros((0, 4, 4)), np.ones((0, 3)), error_messages, elapses
+
+    RTs = np.zeros((num_instances, 4, 4))
+    bbox_scales = np.ones((num_instances, 3))
+    
+    for i in range(num_instances):
+        #class_name = synset_names[class_ids[i]]
+        class_id = class_ids[i]
+        mask = masks[:, :, i]
+        coord = coords[:, :, i, :]
+        abs_coord_pts = np.abs(coord[mask==1] - 0.5)
+        bbox_scales[i, :] = 2*np.amax(abs_coord_pts, axis=0)
+
+        pts, idxs = backproject(depth, intrinsics, mask)
+        coord_pts = coord[idxs[0], idxs[1], :] - 0.5
+
+        if if_norm:
+            scale = np.linalg.norm(bbox_scales[i, :])
+            bbox_scales[i, :] /= scale
+            coord_pts /= scale
+
+        
+        try:
+            start = time.time()
+            
+            scales, rotation, translation, outtransform = estimateSimilarityTransform(coord_pts, pts, False)
+
+            aligned_RT = np.zeros((4, 4), dtype=np.float32) 
+            if with_scale:
+                aligned_RT[:3, :3] = np.diag(scales) / 1000 @ rotation.transpose()
+            else:
+                aligned_RT[:3, :3] = rotation.transpose()
+            aligned_RT[:3, 3] = translation / 1000
+            aligned_RT[3, 3] = 1
+            
+            if save_path is not None:
+                coord_pts_rotated = aligned_RT[:3, :3] @ coord_pts.transpose() + aligned_RT[:3, 3:]
+                coord_pts_rotated = coord_pts_rotated.transpose()
+                np.savetxt(save_path+'_{}_{}_depth_pts.txt'.format(i, class_id), pts)
+                np.savetxt(save_path+'_{}_{}_coord_pts.txt'.format(i, class_id), coord_pts)
+                np.savetxt(save_path+'_{}_{}_coord_pts_aligned.txt'.format(i, class_id), coord_pts_rotated)
+
+            if verbose:
+                print('Mask ID: ', i)
+                print('Scale: ', scales/1000)
+                print('Rotation: ', rotation.transpose())
+                print('Translation: ', translation/1000)
+
+            elapsed = time.time() - start
+            print('elapsed: ', elapsed)
+            elapses.append(elapsed)
+        
+
+        except Exception as e:
+            message = '[ Error ] aligning instance {} in {} fails. Message: {}.'.format(synset_names[class_id], image_path, str(e))
+            print(message)
+            error_messages += message + '\n'
+            aligned_RT = np.identity(4, dtype=np.float32) 
+
+        # print('Estimation takes {:03f}s.'.format(time.time() - start))
+        # from camera world to computer vision frame
+        z_180_RT = np.zeros((4, 4), dtype=np.float32)
+        z_180_RT[:3, :3] = np.diag([-1, -1, 1])
+        z_180_RT[3, 3] = 1
+
+        RTs[i, :, :] = z_180_RT @ aligned_RT 
+
+    return RTs, bbox_scales, error_messages, elapses

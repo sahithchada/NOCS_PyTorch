@@ -1652,6 +1652,7 @@ class MaskRCNN(nn.Module):
                     mrcnn_coord_x_bin_value = mrcnn_coord_x_bin_value.cuda()
                     mrcnn_coord_y_bin_value = mrcnn_coord_x_bin_value.cuda()
                     mrcnn_coord_z_bin_value = mrcnn_coord_x_bin_value.cuda()
+                pred_coords = torch.vstack([mrcnn_coord_x_bin_value,mrcnn_coord_y_bin_value,mrcnn_coord_z_bin_value])
 
             else:
                 # Network Heads
