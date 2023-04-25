@@ -152,12 +152,9 @@ def model_loaded_weights(config,inference = None,trained_path = None):
                 final_weights = torch.vstack((w1,w3,w2))
                 pass
 
-            # weights shape = (324,1024)
-            # expected 28,1024
-            # 0:3, 160:163, 184:187, 256:259, 168:171
             elif weights.shape[0] == 324 and len(weights.shape) > 1:
                 weights = torch.reshape(weights, (81,4,1024))
-                # weights = weights.view(weights.size()[0], -1, 4)
+
                 w1 = weights[[0,40,46]]
                 w2 = weights[[64,42]]
                 w3 = torch.zeros_like(w2)
@@ -237,6 +234,16 @@ if __name__ == '__main__':
                     'bowl', #2
                     'camera', #3
                     'can',  #4
+                    'laptop',#5
+                    'mug'#6
+                    ]
+    
+
+    synset_names = ['BG', #0
+                    # 'bottle', #1
+                    # 'bowl', #2
+                    'camera', #3
+                    # 'can',  #4
                     'laptop',#5
                     'mug'#6
                     ]

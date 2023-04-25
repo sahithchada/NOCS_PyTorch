@@ -644,14 +644,13 @@ def plot_loss2(loss, val_loss, save=True, log_dir=None):
 
 
 
-def plot_nocs(coords,masks,fl_name):
+def plot_nocs(coords,fl_name):
 
     id = fl_name.split('_')[0]
     out = np.zeros_like(coords[0])
 
     for i in range(len(coords)):
-        mask = masks[:,:,i]
-        out += coords[i] * np.expand_dims(mask,axis=-1)
+        out += coords[i]
 
     plt.figure()
     plt.imshow(out)
