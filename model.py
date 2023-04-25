@@ -1642,6 +1642,8 @@ class MaskRCNN(nn.Module):
                 mrcnn_coord_y_bin_value = torch.FloatTensor()
                 mrcnn_coord_z_bin_value = torch.FloatTensor()
 
+                pred_coords = torch.vstack([mrcnn_coord_x_bin_value,mrcnn_coord_y_bin_value,mrcnn_coord_z_bin_value])
+
 
                 if self.config.GPU_COUNT:
                     mrcnn_class_logits = mrcnn_class_logits.cuda()
@@ -1651,9 +1653,8 @@ class MaskRCNN(nn.Module):
                     mrcnn_coord_x_bin = mrcnn_coord_x_bin.cuda()
                     mrcnn_coord_y_bin = mrcnn_coord_y_bin.cuda()
                     mrcnn_coord_z_bin = mrcnn_coord_z_bin.cuda()
-                    mrcnn_coord_x_bin_value = mrcnn_coord_x_bin_value.cuda()
-                    mrcnn_coord_y_bin_value = mrcnn_coord_x_bin_value.cuda()
-                    mrcnn_coord_z_bin_value = mrcnn_coord_x_bin_value.cuda()
+                    
+                    pred_coords = pred_coords.cuda()
 
             else:
                 # Network Heads
@@ -1675,13 +1676,13 @@ class MaskRCNN(nn.Module):
 
                 pred_coords = torch.vstack([mrcnn_coord_x_bin_value,mrcnn_coord_y_bin_value,mrcnn_coord_z_bin_value])
 
-                res_pred = torch.empty(3,pred_coords.shape[1],pred_coords.shape[-2],pred_coords.shape[-1])
-                for i in range(pred_coords.shape[-2]):
-                    cls = target_class_ids[i]
-                    temp = pred_coords[:,i,cls]
-                    res_pred[:,i] = temp
+                # res_pred = torch.empty(3,pred_coords.shape[1],pred_coords.shape[-2],pred_coords.shape[-1])
+                # for i in range(pred_coords.shape[-2]):
+                #     cls = target_class_ids[i]
+                #     temp = pred_coords[:,i,cls]
+                #     res_pred[:,i] = temp
 
-                pred_coords = res_pred
+                # pred_coords = res_pred
                 
             mrcnn_coords_bin=torch.stack((mrcnn_coord_x_bin,mrcnn_coord_y_bin,mrcnn_coord_z_bin))
 
@@ -1719,9 +1720,23 @@ class MaskRCNN(nn.Module):
         if layers in layer_regex.keys():
             layers = layer_regex[layers]
 
+
         # Data generators
-        train_set = Dataset(train_dataset, self.config, augment=True)
-        train_generator = torch.utils.data.DataLoader(train_set, batch_size=1, shuffle=False, num_workers=1)
+        if type(train_dataset) is list:
+
+            if len(train_dataset) == 2:
+
+                synthtrainset = Dataset(train_dataset[0], self.config, augment=True)
+                realtrainset = Dataset(train_dataset[1], self.config, augment=True)
+
+                synth_generator = torch.utils.data.DataLoader(synthtrainset, batch_size=1, shuffle=True, num_workers=1)
+                real_generator = torch.utils.data.DataLoader(realtrainset, batch_size=1, shuffle=True, num_workers=1)
+
+        else:
+            
+            train_set = Dataset(train_dataset, self.config, augment=True)
+            train_generator = torch.utils.data.DataLoader(train_set, batch_size=1, shuffle=True, num_workers=1)
+
         val_set = Dataset(val_dataset, self.config, augment=True)
         val_generator = torch.utils.data.DataLoader(val_set, batch_size=1, shuffle=False, num_workers=1)
 
@@ -1746,7 +1761,15 @@ class MaskRCNN(nn.Module):
             log("Epoch {}/{}.".format(epoch,epochs))
             torch.autograd.set_detect_anomaly(True)
             # Training
-            loss, loss_rpn_class, loss_rpn_bbox, loss_mrcnn_class, loss_mrcnn_bbox, loss_mrcnn_mask, loss_x_coord, loss_y_coord, loss_z_coord = self.train_epoch(train_generator, optimizer, self.config.STEPS_PER_EPOCH)
+            if type(train_dataset) is list:
+
+                if len(train_dataset) == 2:
+
+                    loss, loss_rpn_class, loss_rpn_bbox, loss_mrcnn_class, loss_mrcnn_bbox, loss_mrcnn_mask, loss_x_coord, loss_y_coord, loss_z_coord = self.train_epoch([synth_generator,real_generator], optimizer, self.config.STEPS_PER_EPOCH)
+
+            else:
+
+                loss, loss_rpn_class, loss_rpn_bbox, loss_mrcnn_class, loss_mrcnn_bbox, loss_mrcnn_mask, loss_x_coord, loss_y_coord, loss_z_coord = self.train_epoch(train_generator, optimizer, self.config.STEPS_PER_EPOCH)
 
             # Validation
             val_loss, val_loss_rpn_class, val_loss_rpn_bbox, val_loss_mrcnn_class, val_loss_mrcnn_bbox, val_loss_mrcnn_mask, val_loss_x_coord, val_loss_y_coord, val_loss_z_coord = self.valid_epoch(val_generator, self.config.VALIDATION_STEPS)
@@ -1777,7 +1800,41 @@ class MaskRCNN(nn.Module):
 
         optimizer.zero_grad()
 
-        for inputs in datagenerator:
+        if type(datagenerator) is list:
+
+            if len(datagenerator) == 2:
+                synthgenerator = datagenerator[0]
+                realgenerator = datagenerator[1]
+
+                synth_iter = iter(synthgenerator)
+                real_iter = iter(realgenerator)
+
+                print(len(synth_iter))
+
+
+        else:
+
+            datageniter = iter(datagenerator)
+
+        while step < steps:
+
+            if type(datagenerator) is list:
+
+                if len(datagenerator) == 2:
+                    
+                    num = random.random()
+
+                    if num > 0.4:
+                        inputs = next(synth_iter)
+                        print('synth')
+                    else:
+                        inputs = next(real_iter)
+                        print('real')
+
+            else:
+
+                inputs = next(datageniter)
+
             batch_count += 1
 
             images = inputs[0]
@@ -1789,6 +1846,11 @@ class MaskRCNN(nn.Module):
             gt_masks = inputs[6]
             gt_coords = inputs[7]
             gt_domain_label = inputs[8]
+
+            # plt.figure(1)
+            # plt.imshow(gt_masks[0].sum(0))
+            # plt.savefig('output_images/dual_test.png')
+            # plt.close(1)
 
             if rpn_bbox.sum() == 0:
                 batch_count -= 1
@@ -1916,25 +1978,25 @@ class MaskRCNN(nn.Module):
                     target_domain_labels = target_domain_labels.cuda() 
 
 
-                if step == 0:
-                    plt.figure(1)
-                    for i in range(32):
+                # if step == 0:
+                #     plt.figure(1)
+                #     for i in range(32):
 
-                        targ_coord = target_coords[:,i].permute(1,2,0)
-                        plt.subplot(8,4,i+1)
-                        plt.imshow(targ_coord.detach().cpu().numpy())
+                #         targ_coord = target_coords[:,i].permute(1,2,0)
+                #         plt.subplot(8,4,i+1)
+                #         plt.imshow(targ_coord.detach().cpu().numpy())
                     
-                    plt.savefig('output_images/targ_coords')
+                #     plt.savefig('output_images/targ_coords')
 
                     
-                    plt.figure(1)
-                    for i in range(32):
+                #     plt.figure(1)
+                #     for i in range(32):
 
-                        pred_coord = pred_coords[:,i].permute(1,2,0)
-                        plt.subplot(8,4,i+1)
-                        plt.imshow(pred_coord.detach().cpu().numpy())
+                #         pred_coord = pred_coords[:,i].permute(1,2,0)
+                #         plt.subplot(8,4,i+1)
+                #         plt.imshow(pred_coord.detach().cpu().numpy())
                     
-                    plt.savefig('output_images/pred_coords')
+                #     plt.savefig('output_images/pred_coords')
 
                 # Compute losses
                 rpn_class_loss, rpn_bbox_loss, mrcnn_class_loss, mrcnn_bbox_loss, mrcnn_mask_loss ,coord_bin_loss = compute_losses(rpn_match, rpn_bbox, rpn_class_logits, rpn_pred_bbox, target_class_ids, mrcnn_class_logits, target_deltas, mrcnn_bbox, target_mask, mrcnn_mask, mrcnn_coords_bin,target_coords,target_domain_labels)
