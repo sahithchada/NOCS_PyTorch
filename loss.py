@@ -18,12 +18,12 @@ def compute_losses(rpn_match, rpn_bbox, rpn_class_logits, rpn_pred_bbox, target_
     mrcnn_mask_loss = compute_mrcnn_mask_loss(target_mask, target_class_ids, mrcnn_mask)
     mrcnn_coord_bins_symmetry_loss=compute_mrcnn_coord_bins_symmetry_loss(target_mask, target_coords, target_class_ids, target_domain_labels, pred_coords)
 
-    target_mask_np = target_mask.detach().cpu().numpy()
-    target_coords_np = target_coords.detach().cpu().numpy()
-    target_class_ids_np = target_class_ids.detach().cpu().numpy()
-    target_domain_labels_np = target_domain_labels.detach().cpu().numpy()
-    pred_coords_np = pred_coords.detach().cpu().numpy()
-    np.savez('loss_inputs.npz', target_mask_np = target_mask_np , target_coords_np=target_coords_np, target_class_ids_np = target_class_ids_np, target_domain_labels_np = target_domain_labels_np, pred_coords_np = pred_coords_np)
+    # target_mask_np = target_mask.detach().cpu().numpy()
+    # target_coords_np = target_coords.detach().cpu().numpy()
+    # target_class_ids_np = target_class_ids.detach().cpu().numpy()
+    # target_domain_labels_np = target_domain_labels.detach().cpu().numpy()
+    # pred_coords_np = pred_coords.detach().cpu().numpy()
+    # np.savez('loss_inputs.npz', target_mask_np = target_mask_np , target_coords_np=target_coords_np, target_class_ids_np = target_class_ids_np, target_domain_labels_np = target_domain_labels_np, pred_coords_np = pred_coords_np)
 
 
     return [rpn_class_loss, rpn_bbox_loss, mrcnn_class_loss, mrcnn_bbox_loss, mrcnn_mask_loss,mrcnn_coord_bins_symmetry_loss]
@@ -110,7 +110,7 @@ def compute_mrcnn_coord_bins_symmetry_loss(target_masks, target_coords, target_c
             y_true_stack , indices = nocs_map_rotation(positive_class_ids,positive_ix,target_coords,mask_shape)
             ## shape: [num_pos_rois, height, width, 3, 6] 
            
-           
+
             y_true_stack = y_true_stack.permute(0, 1, 2, 4, 3)## shape: [num_pos_rois, height, width, 6, 3]
             y_true_stack = y_true_stack + 0.5
 
