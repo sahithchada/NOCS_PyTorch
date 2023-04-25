@@ -238,17 +238,6 @@ if __name__ == '__main__':
                     'mug'#6
                     ]
     
-
-    synset_names = ['BG', #0
-                    # 'bottle', #1
-                    # 'bowl', #2
-                    'camera', #3
-                    # 'can',  #4
-                    'laptop',#5
-                    'mug'#6
-                    ]
-    
-
     class_map = {
         'bottle': 'bottle',
         'bowl':'bowl',
