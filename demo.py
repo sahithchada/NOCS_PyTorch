@@ -31,7 +31,7 @@ MODEL_DIR = os.path.join(ROOT_DIR, "logs")
 
 COCO_MODEL_PATH = os.path.join(ROOT_DIR, "models/mask_rcnn_coco.pth")
 # TRAINED_PATH = 'models\mask_rcnn_nocs_train_0010.pth'
-TRAINED_PATH = 'mask_rcnn_nocs_train_0016.pth'
+TRAINED_PATH = 'mask_rcnn_nocs_train_0041.pth'
 # TRAINED_PATH = 'models/nocs_train20230422T1839/mask_rcnn_nocs_train_0025.pth'
 
 # Directory of images to run detection on
@@ -39,9 +39,8 @@ IMAGE_DIR = os.path.join(ROOT_DIR, "images")
 
 
 # Path to specific image
-IMAGE_SPECIFIC = 'images/real_real.jpg'
-
-# IMAGE_SPECIFIC = None
+# IMAGE_SPECIFIC = 'images/real_real.jpg'
+IMAGE_SPECIFIC = None
 
 class InferenceConfig(coco.CocoConfig):
     # Set batch size to 1 since we'll be running inference on
@@ -97,24 +96,17 @@ config.display()
 
 model = model_loaded_weights(config,inference=True,trained_path=TRAINED_PATH)
 
+def read_file_detect(fl,specific = False):
 
-def run_model(model,fl_path = None ):
-
-    if fl_path:
-        image = skimage.io.imread(fl_path)
-        file_name = fl_path.split('_')[-2].split('/')[-1]
-        print(file_name+'.png')
-
-    else:
-        
-        # Here we get all file names in image dir
-        file_names = [f for f in os.listdir(IMAGE_DIR) if f.endswith(( '.png'))]
-
-        # Decide between random choice or run on certain image
-        file_name = random.choice(file_names)
+    if specific:
+        file_name = fl.split('_')[-2].split('/')[-1]
         print(file_name)
+        image = skimage.io.imread(fl)
+        fl = file_name
+    else:
+        print(fl)
+        image = skimage.io.imread(os.path.join(IMAGE_DIR, fl))
 
-        image = skimage.io.imread(os.path.join(IMAGE_DIR, file_name))
 
     if image.shape[2] == 4:
         image = image[:,:,:3]  
@@ -127,10 +119,34 @@ def run_model(model,fl_path = None ):
 
     rois, masks, class_ids, scores, coords = r['rois'], r['masks'], r['class_ids'], r['scores'],r['coords']
 
-    visualize.plot_nocs(coords,file_name)
+    visualize.plot_nocs(coords,fl)
 
-    visualize.display_instances(image, rois, masks, class_ids, synset_names,file_name,scores)
+    visualize.display_instances(image, rois, masks, class_ids, synset_names,fl,scores)
 
 
+def run_model(model, single = True, fl_path = None):
 
-run_model(model,fl_path=IMAGE_SPECIFIC)
+    if fl_path:       
+        read_file_detect(fl_path,specific = True)
+
+
+    else:
+        
+        # Here we get all file names in image dir
+        file_names = [f for f in os.listdir(IMAGE_DIR) if f.endswith(( '.png'))]
+
+        if single:
+
+            # Decide between random choice or run on certain image
+            fl = random.choice(file_names)
+            
+            read_file_detect(fl)
+
+        else:
+            for fl in file_names:
+
+                if fl.split('.')[0].split('_')[-1] == 'color':
+
+                    read_file_detect(fl)         
+
+run_model(model,single = True,fl_path=IMAGE_SPECIFIC)
