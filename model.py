@@ -1597,6 +1597,9 @@ class MaskRCNN(nn.Module):
             mrcnn_coord_y_bin_value = coord_bin_values_module(mrcnn_coord_y_bin).unsqueeze(0)
             mrcnn_coord_z_bin_value = coord_bin_values_module(mrcnn_coord_z_bin).unsqueeze(0)
 
+            mrcnn_coord_x_bin_value = mrcnn_coord_x_bin_value * mrcnn_mask
+            mrcnn_coord_y_bin_value = mrcnn_coord_y_bin_value * mrcnn_mask
+            mrcnn_coord_z_bin_value = mrcnn_coord_z_bin_value * mrcnn_mask
 
 
             return [detections, mrcnn_mask,mrcnn_coord_x_bin_value,mrcnn_coord_y_bin_value,mrcnn_coord_z_bin_value]

@@ -109,8 +109,8 @@ def compute_mrcnn_coord_bins_symmetry_loss(target_masks, target_coords, target_c
 
             y_true_stack , indices = nocs_map_rotation(positive_class_ids,positive_ix,target_coords,mask_shape)
             ## shape: [num_pos_rois, height, width, 3, 6] 
-            
-            
+           
+           
             y_true_stack = y_true_stack.permute(0, 1, 2, 4, 3)## shape: [num_pos_rois, height, width, 6, 3]
             y_true_stack = y_true_stack + 0.5
 
@@ -166,7 +166,7 @@ def compute_mrcnn_coord_bins_symmetry_loss(target_masks, target_coords, target_c
             cross_loss = F.nll_loss(y_pred_logits, y_true_bins_stack,reduction='none')
 
             mask = torch.index_select(target_masks, 0, positive_ix) ## shape: [num_pixels_in_mask, 6, 3]
-            mask = torch.index_select(target_masks, 0, positive_ix) ## shape: [num_pixels_in_mask, 6, 3]
+            # mask = torch.index_select(target_masks, 0, positive_ix) ## shape: [num_pixels_in_mask, 6, 3]
             reshape_mask = mask.reshape(mask.shape[0], mask.shape[1], mask.shape[2], 1, 1) 
             ## shape: [num_pos_rois, height, width, 1, 1]
 

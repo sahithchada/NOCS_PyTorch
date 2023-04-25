@@ -39,8 +39,9 @@ IMAGE_DIR = os.path.join(ROOT_DIR, "images")
 
 
 # Path to specific image
-# IMAGE_SPECIFIC = 'images/0000_color.png'
-IMAGE_SPECIFIC = None
+IMAGE_SPECIFIC = 'images/real_real.jpg'
+
+# IMAGE_SPECIFIC = None
 
 class InferenceConfig(coco.CocoConfig):
     # Set batch size to 1 since we'll be running inference on
