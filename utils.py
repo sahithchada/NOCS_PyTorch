@@ -892,6 +892,23 @@ def pyramid_roi_align(inputs, pool_size, image_shape):
 
     return pooled
 
+## functions for umeyama
+
+
+def trim_zeros(x):
+    """It's common to have tensors larger than the available data and
+    pad with zeros. This function removes rows that are all zeros.
+    x: [rows, columns].
+    """
+
+    pre_shape = x.shape
+    assert len(x.shape) == 2, x.shape
+    new_x = x[~np.all(x == 0, axis=1)]
+    post_shape = new_x.shape
+    assert pre_shape[0] == post_shape[0]
+    assert pre_shape[1] == post_shape[1]
+
+    return new_x
 
 def backproject(depth, intrinsics, instance_mask):
     intrinsics_inv = np.linalg.inv(intrinsics)
@@ -1001,3 +1018,467 @@ def align(class_ids, masks, coords, depth, intrinsics, synset_names, image_path,
         RTs[i, :, :] = z_180_RT @ aligned_RT 
 
     return RTs, bbox_scales, error_messages, elapses
+
+def compute_overlaps_masks(masks1, masks2):
+    '''Computes IoU overlaps between two sets of masks.
+    masks1, masks2: [Height, Width, instances]
+    '''
+    # flatten masks
+    masks1 = np.reshape(masks1 > .5, (-1, masks1.shape[-1])).astype(np.float32)
+    masks2 = np.reshape(masks2 > .5, (-1, masks2.shape[-1])).astype(np.float32)
+    area1 = np.sum(masks1, axis=0)
+    area2 = np.sum(masks2, axis=0)
+
+    # intersections and union
+    intersections = np.dot(masks1.T, masks2)
+    union = area1[:, None] + area2[None, :] - intersections
+    overlaps = intersections / union
+
+    return overlaps
+
+def compute_RT_degree_cm_symmetry(RT_1, RT_2, class_id, handle_visibility, synset_names):
+    '''
+    :param RT_1: [4, 4]. homogeneous affine transformation
+    :param RT_2: [4, 4]. homogeneous affine transformation
+    :return: theta: angle difference of R in degree, shift: l2 difference of T in centimeter
+
+
+    synset_names = ['BG',  # 0
+                    'bottle',  # 1
+                    'bowl',  # 2
+                    'camera',  # 3
+                    'can',  # 4
+                    'cap',  # 5
+                    'phone',  # 6
+                    'monitor',  # 7
+                    'laptop',  # 8
+                    'mug'  # 9
+                    ]
+    
+    synset_names = ['BG',  # 0
+                    'bottle',  # 1
+                    'bowl',  # 2
+                    'camera',  # 3
+                    'can',  # 4
+                    'laptop',  # 5
+                    'mug'  # 6
+                    ]
+    '''
+
+    ## make sure the last row is [0, 0, 0, 1]
+    if RT_1 is None or RT_2 is None:
+        return -1
+    try:
+        assert np.array_equal(RT_1[3, :], RT_2[3, :])
+        assert np.array_equal(RT_1[3, :], np.array([0, 0, 0, 1]))
+    except AssertionError:
+        print(RT_1[3, :], RT_2[3, :])
+        exit()
+
+    R1 = RT_1[:3, :3] / np.cbrt(np.linalg.det(RT_1[:3, :3]))
+    T1 = RT_1[:3, 3]
+
+    R2 = RT_2[:3, :3] / np.cbrt(np.linalg.det(RT_2[:3, :3]))
+    T2 = RT_2[:3, 3]
+
+#     try:
+#         assert np.abs(np.linalg.det(R1) - 1) < 0.01
+#         assert np.abs(np.linalg.det(R2) - 1) < 0.01
+#     except AssertionError:
+#         print(np.linalg.det(R1), np.linalg.det(R2))
+
+    if synset_names[class_id] in ['bottle', 'can', 'bowl']:  ## symmetric when rotating around y-axis
+        y = np.array([0, 1, 0])
+        y1 = R1 @ y
+        y2 = R2 @ y
+        theta = np.arccos(y1.dot(y2) / (np.linalg.norm(y1) * np.linalg.norm(y2)))
+    elif synset_names[class_id] == 'mug' and handle_visibility==0:  ## symmetric when rotating around y-axis
+        y = np.array([0, 1, 0])
+        y1 = R1 @ y
+        y2 = R2 @ y
+        theta = np.arccos(y1.dot(y2) / (np.linalg.norm(y1) * np.linalg.norm(y2)))
+    elif synset_names[class_id] in ['phone', 'eggbox', 'glue']:
+        y_180_RT = np.diag([-1.0, 1.0, -1.0])
+        R = R1 @ R2.transpose()
+        R_rot = R1 @ y_180_RT @ R2.transpose()
+        theta = min(np.arccos((np.trace(R) - 1) / 2),
+                    np.arccos((np.trace(R_rot) - 1) / 2))
+    else:
+        R = R1 @ R2.transpose()
+        theta = np.arccos((np.trace(R) - 1) / 2)
+
+    theta *= 180 / np.pi
+    shift = np.linalg.norm(T1 - T2) * 100
+    result = np.array([theta, shift])
+
+    return result
+
+def draw(img, imgpts, axes, color):
+    imgpts = np.int32(imgpts).reshape(-1, 2)
+
+
+    # draw ground layer in darker color
+    color_ground = (int(color[0] * 0.3), int(color[1] * 0.3), int(color[2] * 0.3))
+    for i, j in zip([4, 5, 6, 7],[5, 7, 4, 6]):
+        img = cv2.line(img, tuple(imgpts[i]), tuple(imgpts[j]), color_ground, 3)
+
+
+    # draw pillars in blue color
+    color_pillar = (int(color[0]*0.6), int(color[1]*0.6), int(color[2]*0.6))
+    for i, j in zip(range(4),range(4,8)):
+        img = cv2.line(img, tuple(imgpts[i]), tuple(imgpts[j]), color_pillar, 3)
+
+    
+    # finally, draw top layer in color
+    for i, j in zip([0, 1, 2, 3],[1, 3, 0, 2]):
+        img = cv2.line(img, tuple(imgpts[i]), tuple(imgpts[j]), color, 3)
+
+
+    # draw axes
+    img = cv2.line(img, tuple(axes[0]), tuple(axes[1]), (0, 0, 255), 3)
+    img = cv2.line(img, tuple(axes[0]), tuple(axes[3]), (255, 0, 0), 3)
+    img = cv2.line(img, tuple(axes[0]), tuple(axes[2]), (0, 255, 0), 3) ## y last
+
+
+    return img
+
+def compute_matches(gt_boxes, gt_class_ids, gt_masks,
+                    pred_boxes, pred_class_ids, pred_scores, pred_masks,
+                    iou_threshold=0.5, score_threshold=0.0):
+    """Finds matches between prediction and ground truth instances.
+    Returns:
+        gt_match: 1-D array. For each GT box it has the index of the matched
+                  predicted box.
+        pred_match: 1-D array. For each predicted box, it has the index of
+                    the matched ground truth box.
+        overlaps: [pred_boxes, gt_boxes] IoU overlaps.
+    """
+    # Trim zero padding
+    # TODO: cleaner to do zero unpadding upstream
+    if len(gt_class_ids)==0 or len(pred_class_ids) == 0:
+        return -1 * np.ones([len(gt_class_ids)]), -1 * np.ones([len(pred_class_ids)]), None, np.zeros([0])
+
+    pre_len = len(gt_boxes)
+    gt_boxes = trim_zeros(gt_boxes)
+    after_len = len(gt_boxes)
+    assert pre_len == after_len
+    gt_masks = gt_masks[..., :gt_boxes.shape[0]]
+
+    pre_len = len(pred_boxes)
+    pred_boxes = trim_zeros(pred_boxes)
+    after_len = len(pred_boxes)
+    assert pre_len == after_len
+    pred_scores = pred_scores[:pred_boxes.shape[0]]
+
+    # Sort predictions by score from high to low
+    indices = np.argsort(pred_scores)[::-1]
+    
+    pred_boxes = pred_boxes[indices]
+    pred_class_ids = pred_class_ids[indices]
+    pred_scores = pred_scores[indices]
+    pred_masks = pred_masks[..., indices]
+
+    # Compute IoU overlaps [pred_masks, gt_masks]
+    overlaps = compute_overlaps_masks(pred_masks, gt_masks)
+
+    # Loop through predictions and find matching ground truth boxes
+    match_count = 0
+    pred_match = -1 * np.ones([pred_boxes.shape[0]])
+    gt_match = -1 * np.ones([gt_boxes.shape[0]])
+    
+    
+    for i in range(len(pred_boxes)):
+        # Find best matching ground truth box
+        # 1. Sort matches by score
+        sorted_ixs = np.argsort(overlaps[i])[::-1]
+        # 2. Remove low scores
+        low_score_idx = np.where(overlaps[i, sorted_ixs] < score_threshold)[0]
+        if low_score_idx.size > 0:
+            sorted_ixs = sorted_ixs[:low_score_idx[0]]
+        # 3. Find the match
+        for j in sorted_ixs:
+            # If ground truth box is already matched, go to next one
+            if gt_match[j] > -1:
+                continue
+            # If we reach IoU smaller than the threshold, end the loop
+            iou = overlaps[i, j]
+            if iou < iou_threshold:
+                break
+            # Do we have a match?
+            if pred_class_ids[i] == gt_class_ids[j]:
+                match_count += 1
+                gt_match[j] = i
+                pred_match[i] = j
+                break
+
+    return gt_match, pred_match, overlaps, indices
+
+
+def get_3d_bbox(scale, shift = 0):
+    """
+    Input: 
+        scale: [3] or scalar
+        shift: [3] or scalar
+    Return 
+        bbox_3d: [3, N]
+
+    """
+    if hasattr(scale, "__iter__"):
+        bbox_3d = np.array([[scale[0] / 2, +scale[1] / 2, scale[2] / 2],
+                  [scale[0] / 2, +scale[1] / 2, -scale[2] / 2],
+                  [-scale[0] / 2, +scale[1] / 2, scale[2] / 2],
+                  [-scale[0] / 2, +scale[1] / 2, -scale[2] / 2],
+                  [+scale[0] / 2, -scale[1] / 2, scale[2] / 2],
+                  [+scale[0] / 2, -scale[1] / 2, -scale[2] / 2],
+                  [-scale[0] / 2, -scale[1] / 2, scale[2] / 2],
+                  [-scale[0] / 2, -scale[1] / 2, -scale[2] / 2]]) + shift
+    else:
+        bbox_3d = np.array([[scale / 2, +scale / 2, scale / 2],
+                  [scale / 2, +scale / 2, -scale / 2],
+                  [-scale / 2, +scale / 2, scale / 2],
+                  [-scale / 2, +scale / 2, -scale / 2],
+                  [+scale / 2, -scale / 2, scale / 2],
+                  [+scale / 2, -scale / 2, -scale / 2],
+                  [-scale / 2, -scale / 2, scale / 2],
+                  [-scale / 2, -scale / 2, -scale / 2]]) +shift
+
+    bbox_3d = bbox_3d.transpose()
+    return bbox_3d
+
+def transform_coordinates_3d(coordinates, RT):
+    """
+    Input: 
+        coordinates: [3, N]
+        RT: [4, 4]
+    Return 
+        new_coordinates: [3, N]
+
+    """
+    assert coordinates.shape[0] == 3
+    coordinates = np.vstack([coordinates, np.ones((1, coordinates.shape[1]), dtype=np.float32)])
+    new_coordinates = RT @ coordinates
+    new_coordinates = new_coordinates[:3, :]/new_coordinates[3, :]
+    return new_coordinates
+
+
+def calculate_2d_projections(coordinates_3d, intrinsics):
+    """
+    Input: 
+        coordinates: [3, N]
+        intrinsics: [3, 3]
+    Return 
+        projected_coordinates: [N, 2]
+    """
+    projected_coordinates = intrinsics @ coordinates_3d
+    projected_coordinates = projected_coordinates[:2, :] / projected_coordinates[2, :]
+    projected_coordinates = projected_coordinates.transpose()
+    projected_coordinates = np.array(projected_coordinates, dtype=np.int32)
+
+    return projected_coordinates
+
+def draw_text(draw_image, bbox, text, draw_box=False):
+    fontFace = cv2.FONT_HERSHEY_TRIPLEX
+    fontScale = 1
+    thickness = 1
+    
+
+    retval, baseline = cv2.getTextSize(text, fontFace, fontScale, thickness)
+    
+    bbox_margin = 10
+    text_margin = 10
+    
+    text_box_pos_tl = (min(bbox[1] + bbox_margin, 635 - retval[0] - 2* text_margin) , min(bbox[2] + bbox_margin, 475 - retval[1] - 2* text_margin)) 
+    text_box_pos_br = (text_box_pos_tl[0] + retval[0] + 2* text_margin,  text_box_pos_tl[1] + retval[1] + 2* text_margin)
+
+    # text_pose is the bottom-left corner of the text
+    text_pos = (text_box_pos_tl[0] + text_margin, text_box_pos_br[1] - text_margin - 3)
+    
+    if draw_box:
+        cv2.rectangle(draw_image, 
+                      (bbox[1], bbox[0]),
+                      (bbox[3], bbox[2]),
+                      (255, 0, 0), 2)
+
+    cv2.rectangle(draw_image, 
+                  text_box_pos_tl,
+                  text_box_pos_br,
+                  (255,0,0), -1)
+    
+    cv2.rectangle(draw_image, 
+                  text_box_pos_tl,
+                  text_box_pos_br,
+                  (0,0,0), 1)
+
+    cv2.putText(draw_image, text, text_pos,
+                fontFace, fontScale, (255,255,255), thickness)
+
+    return draw_image
+
+def draw_detections(image, save_dir, data_name, image_id, intrinsics, synset_names, draw_rgb_coord,
+                    gt_bbox, gt_class_ids, gt_mask, gt_coord, gt_RTs, gt_scales, gt_handle_visibility,
+                    pred_bbox, pred_class_ids, pred_mask, pred_coord, pred_RTs, pred_scores, pred_scales,
+                    draw_gt=True, draw_pred=True, draw_tag=False):
+
+    alpha = 0.5
+
+    if draw_gt:
+        output_path = os.path.join(save_dir, '{}_{}_coord_gt.png'.format(data_name, image_id))
+        draw_image = image.copy()
+        num_gt_instances = len(gt_class_ids)
+
+        for i in range(num_gt_instances):
+            mask = gt_mask[:, :, i]
+            #mask = mask[:, :, np.newaxis]
+            #mask = np.repeat(mask, 3, axis=-1)
+            cind, rind = np.where(mask == 1)
+            coord_data = gt_coord[:, :, i, :].copy()
+            coord_data[:, :, 2] = 1 - coord_data[:, :, 2] # undo the z axis flipping to match original data        
+            draw_image[cind, rind] = coord_data[cind, rind] * 255
+            
+        if draw_tag:
+            for i in range(num_gt_instances):
+                overlay = draw_image.copy()
+                overlay = draw_text(overlay, gt_bbox[i], synset_names[gt_class_ids[i]], draw_box=True)
+                cv2.addWeighted(overlay, alpha, draw_image, 1 - alpha, 0, draw_image)
+            
+        # #if draw_tag:
+        # for i in range(num_gt_instances):
+        #     print('a', synset_names[gt_class_ids[i]])
+        #     if synset_names[gt_class_ids[i]] == 'camera':
+        #         overlay = draw_image.copy()
+        #         cv2.rectangle(overlay, 
+        #               (gt_bbox[i][1], gt_bbox[i][0]),
+        #               (gt_bbox[i][3], gt_bbox[i][2]),
+        #               (255, 0, 0), 2)
+
+        #         cv2.addWeighted(overlay, alpha, draw_image, 1 - alpha, 0, draw_image)
+
+        
+        cv2.imwrite(output_path, draw_image[:, :, ::-1])
+
+        output_path = os.path.join(save_dir, '{}_{}_bbox_gt.png'.format(data_name, image_id))
+        draw_image_bbox = image.copy()
+
+        if gt_RTs is not None:
+            for ind, RT in enumerate(gt_RTs):
+                cls_id = gt_class_ids[ind]
+
+                xyz_axis = 0.3*np.array([[0, 0, 0], [0, 0, 1], [0, 1, 0], [1, 0, 0]]).transpose()
+                transformed_axes = transform_coordinates_3d(xyz_axis, RT)
+                projected_axes = calculate_2d_projections(transformed_axes, intrinsics)
+
+
+                bbox_3d = get_3d_bbox(gt_scales[ind], 0)
+                transformed_bbox_3d = transform_coordinates_3d(bbox_3d, RT)
+                projected_bbox = calculate_2d_projections(transformed_bbox_3d, intrinsics)
+                draw_image_bbox = draw(draw_image_bbox, projected_bbox, projected_axes, (255, 0, 0))
+
+        cv2.imwrite(output_path, draw_image_bbox[:, :, ::-1])
+
+
+    if draw_pred:
+        print('a'*50)
+        # Vs, Fs = dataset.load_objs(image_id, is_normalized=True) ## scale is estimated in RT
+        output_path   = os.path.join(save_dir, '{}_{}_coord_pred.png'.format(data_name, image_id))
+        output_path_r = os.path.join(save_dir, '{}_{}_coord_pred_r.png'.format(data_name, image_id))
+        output_path_g = os.path.join(save_dir, '{}_{}_coord_pred_g.png'.format(data_name, image_id))
+        output_path_b = os.path.join(save_dir, '{}_{}_coord_pred_b.png'.format(data_name, image_id))
+        # utils.draw_coord_mask(image, r['class_ids'], pred_RTs, Vs, Fs, intrinsics, output_path)
+        draw_image = image.copy()
+        if draw_rgb_coord:
+            r_image = image.copy()
+            g_image = image.copy()
+            b_image = image.copy()
+
+        
+        num_pred_instances = len(pred_class_ids)    
+        for i in range(num_pred_instances):
+            
+            mask = pred_mask[:, :, i]
+            #mask = mask[:, :, np.newaxis]
+            #mask = np.repeat(mask, 3, axis=-1)
+            cind, rind = np.where(mask == 1)
+            coord_data = pred_coord[:, :, i, :].copy()
+            coord_data[:, :, 2] = 1 - coord_data[:, :, 2] # undo the z axis flipping to match original data
+            draw_image[cind, rind] = coord_data[cind, rind] * 255
+            if draw_rgb_coord:
+                b_image[cind, rind, 2] = coord_data[cind, rind, 2] * 255
+                b_image[cind, rind, 0:2] = 0
+
+                g_image[cind, rind, 1] = coord_data[cind, rind, 1] * 255
+                g_image[cind, rind, 0] = 0
+                g_image[cind, rind, 2] = 0
+
+                r_image[cind, rind, 0] = coord_data[cind, rind, 0] * 255
+                r_image[cind, rind, 1:3] = 0
+
+        if draw_tag:
+            for i in range(num_pred_instances):
+                overlay = draw_image.copy()
+                text = synset_names[pred_class_ids[i]]+'({:.2f})'.format(pred_scores[i])
+                overlay = draw_text(overlay, pred_bbox[i], text, draw_box=True)
+                cv2.addWeighted(overlay, alpha, draw_image, 1 - alpha, 0, draw_image)
+
+        cv2.imwrite(output_path, draw_image[:, :, ::-1])
+
+
+
+        if draw_rgb_coord:
+            cv2.imwrite(output_path_r, r_image[:, :, ::-1])
+            cv2.imwrite(output_path_g, g_image[:, :, ::-1])
+            cv2.imwrite(output_path_b, b_image[:, :, ::-1])
+                        
+        
+        output_path = os.path.join(save_dir, '{}_{}_bbox_pred.png'.format(data_name, image_id))
+        draw_image_bbox = image.copy()
+
+        if gt_class_ids is not None:
+            gt_match, pred_match, _, pred_indices = compute_matches(gt_bbox, gt_class_ids, gt_mask,
+                                                                    pred_bbox, pred_class_ids, pred_scores, pred_mask,
+                                                                    0.5)
+
+            if len(pred_indices):
+                pred_class_ids = pred_class_ids[pred_indices]
+                pred_scores = pred_scores[pred_indices]        
+                pred_RTs = pred_RTs[pred_indices]
+
+        
+        for ind in range(num_pred_instances):
+            RT = pred_RTs[ind]
+            cls_id = pred_class_ids[ind]
+            
+            if gt_class_ids is not None:## if gt exists, skip instances that fail to match
+                gt_ind = int(pred_match[ind])
+                if gt_ind == -1:
+                    continue
+            
+            xyz_axis = 0.3*np.array([[0, 0, 0], [0, 0, 1], [0, 1, 0], [1, 0, 0]]).transpose()
+            transformed_axes = transform_coordinates_3d(xyz_axis, RT)
+            projected_axes = calculate_2d_projections(transformed_axes, intrinsics)
+
+
+            bbox_3d = get_3d_bbox(pred_scales[ind, :], 0)
+            transformed_bbox_3d = transform_coordinates_3d(bbox_3d, RT)
+            projected_bbox = calculate_2d_projections(transformed_bbox_3d, intrinsics)
+            draw_image_bbox = draw(draw_image_bbox, projected_bbox, projected_axes, (255, 0, 0))
+
+        if draw_tag:
+            if gt_class_ids is not None: ## if gt exists, draw rotation and translation error
+                for ind in range(num_pred_instances):
+                    gt_ind = int(pred_match[ind])
+                    if gt_ind == -1:
+                        continue
+
+                    overlay = draw_image_bbox.copy()
+                    RT = pred_RTs[ind]
+                    gt_RT = gt_RTs[gt_ind]
+                    cls_id = pred_class_ids[ind]
+                    
+                    degree, cm = compute_RT_degree_cm_symmetry(RT, gt_RT, cls_id, gt_handle_visibility, synset_names)
+                    text = '{}({:.1f}, {:.1f})'.format(synset_names[cls_id], degree, cm)
+                    overlay = draw_text(overlay, pred_bbox[ind], text)
+                    cv2.addWeighted(overlay, alpha, draw_image_bbox, 1 - alpha, 0, draw_image_bbox)
+
+
+
+        cv2.imwrite(output_path, draw_image_bbox[:, :, ::-1])

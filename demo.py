@@ -135,10 +135,14 @@ def run_model(model,fl_path = None ):
 
 r=run_model(model,fl_path=IMAGE_SPECIFIC)
 
-dataset = SyntheticData(synset_names,'train')
+camera_dir = os.path.join('data', 'camera')
+dataset = SyntheticData(synset_names,'val')
 dataset.load_camera_scenes(camera_dir)
 dataset.prepare(class_map)
+image_id=1
 image = dataset.load_image(image_id)
+depth=dataset.load_depth(image_id)
+image_path = dataset.image_info[image_id]["path"]
 
 intrinsics = np.array([[577.5, 0, 319.5], [0., 577.5, 239.5], [0., 0., 1.]]) #for camera data
 result = {}
@@ -150,3 +154,7 @@ if umeyama:
                                                                                         depth, 
                                                                                         intrinsics, 
                                                                                         synset_names,  image_path)
+    
+    utils.draw_detections(image, save_dir, data, image_path_parsing[-2]+'_'+image_path_parsing[-1], intrinsics, synset_names, draw_rgb,
+                                            gt_bbox, gt_class_ids, gt_mask, gt_coord, result['gt_RTs'], gt_scales, result['gt_handle_visibility'],
+                                            r['rois'], r['class_ids'], r['masks'], r['coords'], result['pred_RTs'], r['scores'], result['pred_scales'])
