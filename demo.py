@@ -177,3 +177,5 @@ if umeyama:
     utils.draw_detections(image, save_dir, data, image_id, intrinsics, synset_names, draw_rgb,
                                             gt_bbox, gt_class_ids, gt_mask, gt_coord, result['gt_RTs'], gt_scales, result['gt_handle_visibility'],
                                             r['rois'], r['class_ids'], r['masks'], r['coords'], result['pred_RTs'], r['scores'], result['pred_scales'],draw_gt=False)
+
+run_model(model,single = True,fl_path=IMAGE_SPECIFIC)
