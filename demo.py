@@ -32,7 +32,7 @@ MODEL_DIR = os.path.join(ROOT_DIR, "logs")
 
 COCO_MODEL_PATH = os.path.join(ROOT_DIR, "models/mask_rcnn_coco.pth")
 # TRAINED_PATH = 'models\mask_rcnn_nocs_train_0010.pth'
-TRAINED_PATH = 'mask_rcnn_nocs_train_0031.pth'
+TRAINED_PATH = 'models/real_trained.pth'
 
 # Directory of images to run detection on
 IMAGE_DIR = os.path.join(ROOT_DIR, "images")
@@ -108,7 +108,9 @@ if not os.path.exists(save_dir):
 now = datetime.datetime.now()
 
 use_camera_data=False
+
 image_id=1
+
 if use_camera_data:
     camera_dir = os.path.join('data', 'camera')
     dataset =NOCSData(synset_names,'val')
@@ -136,7 +138,7 @@ else:# for real data
     intrinsics= np.array([[591.0125, 0, 322.525], [0, 590.16775, 244.11084], [0, 0, 1]])
 
 
-
+start_time = datetime.datetime.now()
 
 result = {}
 gt_mask, gt_coord, gt_class_ids, gt_scales, gt_domain_label = dataset.load_mask(image_id)
@@ -163,6 +165,9 @@ if detect:
     #visualize.display_instances(image, rois, masks, class_ids, synset_names,image_id,scores)
     #visualize.plot_nocs(coords,masks,image_id)
     #visualize.display_instances(image, rois, masks, class_ids, synset_names,image_id,scores)
+    #print(np.max(r['coords'][2]))
+    #r['coords'][2]=1-r['coords'][2]
+    r['coords'][:,:,:,2]=1-r['coords'][:,:,:,2]
 
 umeyama=True
 
@@ -180,4 +185,7 @@ if umeyama:
                                             gt_bbox, gt_class_ids, gt_mask, gt_coord, result['gt_RTs'], gt_scales, result['gt_handle_visibility'],
                                             r['rois'], r['class_ids'], r['masks'], r['coords'], result['pred_RTs'], r['scores'], result['pred_scales'],draw_gt=False)
 
-run_model(model,single = True,fl_path=IMAGE_SPECIFIC)
+end_time = datetime.datetime.now()
+execution_time = end_time - start_time
+
+print("Time taken for execution:", execution_time)
