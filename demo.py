@@ -161,6 +161,8 @@ if detect:
     rois, masks, class_ids, scores, coords = r['rois'], r['masks'], r['class_ids'], r['scores'],r['coords']
     #visualize.plot_nocs(coords,masks,image_id)
     #visualize.display_instances(image, rois, masks, class_ids, synset_names,image_id,scores)
+    #visualize.plot_nocs(coords,masks,image_id)
+    #visualize.display_instances(image, rois, masks, class_ids, synset_names,image_id,scores)
 
 umeyama=True
 
