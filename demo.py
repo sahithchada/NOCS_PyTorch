@@ -95,21 +95,32 @@ for coco_cls in class_map:
 config.display()
 
 model = modellib.MaskRCNN(config=config, model_dir=MODEL_DIR)
-model.load_state_dict(torch.load(TRAINED_PATH,map_location=torch.device('cpu')))
+if config.GPU_COUNT==0:
+    model.load_state_dict(torch.load(TRAINED_PATH,map_location=torch.device('cpu')))
+else:
+    model.load_state_dict(torch.load(TRAINED_PATH))
 
 #after loading model
 
-camera_dir = os.path.join('data', 'camera')
-dataset = SyntheticData(synset_names,'val')
-dataset.load_camera_scenes(camera_dir)
-dataset.prepare(class_map)
-image_id=2
-image = dataset.load_image(image_id)
-depth=dataset.load_depth(image_id)
-image_path = dataset.image_info[image_id]["path"]
+save_dir = os.path.join('output_images')
+if not os.path.exists(save_dir):
+            os.makedirs(save_dir)
 now = datetime.datetime.now()
-data="camera/val"
-save_dir = os.path.join('output_images', "{}_{:%Y%m%dT%H%M}".format(data, now))
+
+use_camera_data=True
+if use_camera_data:
+    camera_dir = os.path.join('data', 'camera')
+    dataset = SyntheticData(synset_names,'val')
+    dataset.load_camera_scenes(camera_dir)
+    dataset.prepare(class_map)
+    image_id=25
+    image = dataset.load_image(image_id)
+    depth=dataset.load_depth(image_id)
+    image_path = dataset.image_info[image_id]["path"]
+
+    data="camera/val"
+
+
 
 intrinsics = np.array([[577.5, 0, 319.5], [0., 577.5, 239.5], [0., 0., 1.]]) #for camera data
 result = {}
@@ -133,8 +144,8 @@ if detect:
     # Visualize results
     r = results[0]
     rois, masks, class_ids, scores, coords = r['rois'], r['masks'], r['class_ids'], r['scores'],r['coords']
-    visualize.plot_nocs(coords,masks,image_id)
-    visualize.display_instances(image, rois, masks, class_ids, synset_names,image_id,scores)
+    #visualize.plot_nocs(coords,masks,image_id)
+    #visualize.display_instances(image, rois, masks, class_ids, synset_names,image_id,scores)
 
 umeyama=True
 
@@ -150,4 +161,4 @@ if umeyama:
     result['gt_handle_visibility'] = np.ones_like(gt_class_ids)
     utils.draw_detections(image, save_dir, data, image_id, intrinsics, synset_names, draw_rgb,
                                             gt_bbox, gt_class_ids, gt_mask, gt_coord, result['gt_RTs'], gt_scales, result['gt_handle_visibility'],
-                                            r['rois'], r['class_ids'], r['masks'], r['coords'], result['pred_RTs'], r['scores'], result['pred_scales'])
+                                            r['rois'], r['class_ids'], r['masks'], r['coords'], result['pred_RTs'], r['scores'], result['pred_scales'],draw_gt=False)
