@@ -75,7 +75,7 @@ def apply_mask(image, mask, color, alpha=0.5):
     return image
 
 
-def display_instances(image, boxes, masks, class_ids, class_names, fl_name,
+def display_instances(image, boxes, masks, class_ids, class_names, id,
                       scores=None,title="",
                       figsize=(16, 16), ax=None):
     """
@@ -146,9 +146,9 @@ def display_instances(image, boxes, masks, class_ids, class_names, fl_name,
             ax.add_patch(p)
     ax.imshow(masked_image.astype(np.uint8))
 
-    id = fl_name.split('_')[0]
+    #id = fl_name.split('_')[0]
 
-    plt.savefig("output_images/"+id+"_instances.png")
+    plt.savefig("output_images/"+str(id)+"_instances.png")
     #plt.show()
     
 
@@ -644,16 +644,11 @@ def plot_loss2(loss, val_loss, save=True, log_dir=None):
 
 
 
-def plot_nocs(coords,masks,fl_name):
+def plot_nocs(coords,masks,id):
 
-    id = fl_name.split('_')[0]
-    out = np.zeros_like(coords[0])
-
-    for i in range(len(coords)):
-        mask = masks[:,:,i]
-        out += coords[i] * np.expand_dims(mask,axis=-1)
-
+    masked_coord=coords*np.expand_dims(masks, axis=-1)
+    out=np.sum(masked_coord,axis=2)
+    
     plt.figure()
     plt.imshow(out)
-
-    plt.savefig("output_images/"+id+"_coords.png")
+    plt.savefig("output_images/"+str(id)+"_coords.png")

@@ -15,8 +15,8 @@ import visualize
 import torch
 import cv2
 from dataset import SyntheticData
+import datetime
 
-from train import model_loaded_weights
 
 
 # Root directory of the project
@@ -32,7 +32,7 @@ MODEL_DIR = os.path.join(ROOT_DIR, "logs")
 
 COCO_MODEL_PATH = os.path.join(ROOT_DIR, "models/mask_rcnn_coco.pth")
 # TRAINED_PATH = 'models\mask_rcnn_nocs_train_0010.pth'
-TRAINED_PATH = 'models/nocs_train20230422T1230/mask_rcnn_nocs_train_0025.pth'
+TRAINED_PATH = 'models/nocs_trained_22epochs_all'
 
 # Directory of images to run detection on
 IMAGE_DIR = os.path.join(ROOT_DIR, "images")
@@ -94,67 +94,60 @@ for coco_cls in class_map:
     coco_cls_ids.append(ind)
 config.display()
 
-model = model_loaded_weights(config,inference=True,trained_path=TRAINED_PATH)
+model = modellib.MaskRCNN(config=config, model_dir=MODEL_DIR)
+model.load_state_dict(torch.load(TRAINED_PATH,map_location=torch.device('cpu')))
 
-
-def run_model(model,fl_path = None ):
-
-    if fl_path:
-        image = skimage.io.imread(fl_path)
-        file_name = fl_path.split('_')[-2].split('/')[-1]
-        print(file_name+'.png')
-
-    else:
-        
-        # Here we get all file names in image dir
-        file_names = [f for f in os.listdir(IMAGE_DIR) if f.endswith(( '.png'))]
-
-        # Decide between random choice or run on certain image
-        file_name = random.choice(file_names)
-        print(file_name)
-
-        image = skimage.io.imread(os.path.join(IMAGE_DIR, file_name))
-
-    if image.shape[2] == 4:
-        image = image[:,:,:3]  
-
-    # Run detection
-    results = model.detect([image])
-
-    # Visualize results
-    r = results[0]
-
-    rois, masks, class_ids, scores, coords = r['rois'], r['masks'], r['class_ids'], r['scores'],r['coords']
-
-    visualize.plot_nocs(coords,masks,file_name)
-
-    visualize.display_instances(image, rois, masks, class_ids, synset_names,file_name,scores)
-    return r
-
-
-
-r=run_model(model,fl_path=IMAGE_SPECIFIC)
+#after loading model
 
 camera_dir = os.path.join('data', 'camera')
 dataset = SyntheticData(synset_names,'val')
 dataset.load_camera_scenes(camera_dir)
 dataset.prepare(class_map)
-image_id=1
+image_id=2
 image = dataset.load_image(image_id)
 depth=dataset.load_depth(image_id)
 image_path = dataset.image_info[image_id]["path"]
+now = datetime.datetime.now()
+data="camera/val"
+save_dir = os.path.join('output_images', "{}_{:%Y%m%dT%H%M}".format(data, now))
 
 intrinsics = np.array([[577.5, 0, 319.5], [0., 577.5, 239.5], [0., 0., 1.]]) #for camera data
 result = {}
+gt_mask, gt_coord, gt_class_ids, gt_scales, gt_domain_label = dataset.load_mask(image_id)
+gt_bbox = utils.extract_bboxes(gt_mask)
+result['image_id'] = image_id
+result['image_path'] = image_path
+result['gt_class_ids'] = gt_class_ids
+result['gt_bboxes'] = gt_bbox
+result['gt_RTs'] = None            
+result['gt_scales'] = gt_scales
+
+
+detect= True
+if detect:
+
+    if image.shape[2] == 4:
+        image = image[:,:,:3]  
+    # Run detection
+    results = model.detect([image])
+    # Visualize results
+    r = results[0]
+    rois, masks, class_ids, scores, coords = r['rois'], r['masks'], r['class_ids'], r['scores'],r['coords']
+    visualize.plot_nocs(coords,masks,image_id)
+    visualize.display_instances(image, rois, masks, class_ids, synset_names,image_id,scores)
+
 umeyama=True
+
 if umeyama:
+
     result['pred_RTs'], result['pred_scales'], error_message, elapses =  utils.align(r['class_ids'], 
                                                                                         r['masks'], 
                                                                                         r['coords'], 
                                                                                         depth, 
                                                                                         intrinsics, 
                                                                                         synset_names,  image_path)
-    
-    utils.draw_detections(image, save_dir, data, image_path_parsing[-2]+'_'+image_path_parsing[-1], intrinsics, synset_names, draw_rgb,
+    draw_rgb=True
+    result['gt_handle_visibility'] = np.ones_like(gt_class_ids)
+    utils.draw_detections(image, save_dir, data, image_id, intrinsics, synset_names, draw_rgb,
                                             gt_bbox, gt_class_ids, gt_mask, gt_coord, result['gt_RTs'], gt_scales, result['gt_handle_visibility'],
                                             r['rois'], r['class_ids'], r['masks'], r['coords'], result['pred_RTs'], r['scores'], result['pred_scales'])

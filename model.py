@@ -1598,7 +1598,6 @@ class MaskRCNN(nn.Module):
             mrcnn_coord_z_bin_value = coord_bin_values_module(mrcnn_coord_z_bin).unsqueeze(0)
 
 
-            
 
             return [detections, mrcnn_mask,mrcnn_coord_x_bin_value,mrcnn_coord_y_bin_value,mrcnn_coord_z_bin_value]
 
@@ -2076,6 +2075,8 @@ class MaskRCNN(nn.Module):
 
         full_masks = np.stack(full_masks, axis=-1)\
             if full_masks else np.empty((0,) + masks.shape[1:3])
+        full_coords = np.stack(full_coords, axis=-2)\
+            if full_coords else np.empty((0,) + coords.shape[1:3])
 
         return boxes, class_ids, scores, full_masks,full_coords
 
