@@ -82,7 +82,7 @@ class Nocs_train_config(Config):
     TRAIN_ROIS_PER_IMAGE = 64
 
     # Use a small epoch since the data is simple
-    STEPS_PER_EPOCH = 100
+    STEPS_PER_EPOCH = 1000
 
     # use small validation steps since the epoch is small
     VALIDATION_STEPS = 50
@@ -282,7 +282,7 @@ if __name__ == '__main__':
     print("Training network heads")
     model.train_model([synthtrain,realtrain], valset,
                 learning_rate=config.LEARNING_RATE,
-                epochs=50,
+                epochs=20,
                 layers='heads')
 
     # Training - Stage 2
@@ -290,7 +290,7 @@ if __name__ == '__main__':
     print("Training Resnet layer 4+")
     model.train_model(synthtrain, valset,
                 learning_rate=config.LEARNING_RATE/10,
-                epochs=3,
+                epochs=5,
                 layers='4+')
 
 
