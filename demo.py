@@ -32,7 +32,7 @@ MODEL_DIR = os.path.join(ROOT_DIR, "logs")
 
 COCO_MODEL_PATH = os.path.join(ROOT_DIR, "models/mask_rcnn_coco.pth")
 # TRAINED_PATH = 'models\mask_rcnn_nocs_train_0010.pth'
-TRAINED_PATH = 'models/nocs_trained_22epochs_all'
+TRAINED_PATH = 'mask_rcnn_nocs_train_0031.pth'
 
 # Directory of images to run detection on
 IMAGE_DIR = os.path.join(ROOT_DIR, "images")
@@ -103,7 +103,7 @@ camera_dir = os.path.join('data', 'camera')
 dataset = SyntheticData(synset_names,'val')
 dataset.load_camera_scenes(camera_dir)
 dataset.prepare(class_map)
-image_id=2
+image_id=14
 image = dataset.load_image(image_id)
 depth=dataset.load_depth(image_id)
 image_path = dataset.image_info[image_id]["path"]
