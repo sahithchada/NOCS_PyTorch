@@ -23,7 +23,7 @@ import model as modellib
 import torch
 import argparse
 
-from dataset import SyntheticData, CocoDataset
+from dataset import NOCSData, CocoDataset
 
 # Root directory of the project
 ROOT_DIR = os.getcwd()
@@ -89,7 +89,6 @@ class Nocs_train_config(Config):
 
     WEIGHT_DECAY = 0.0001
     LEARNING_RATE = 0.001
-    # LEARNING_RATE = 0.01
     LEARNING_MOMENTUM = 0.9
 
     COORD_LOSS_SCALE = 1
@@ -152,12 +151,9 @@ def model_loaded_weights(config,inference = None,trained_path = None):
                 final_weights = torch.vstack((w1,w3,w2))
                 pass
 
-            # weights shape = (324,1024)
-            # expected 28,1024
-            # 0:3, 160:163, 184:187, 256:259, 168:171
             elif weights.shape[0] == 324 and len(weights.shape) > 1:
                 weights = torch.reshape(weights, (81,4,1024))
-                # weights = weights.view(weights.size()[0], -1, 4)
+
                 w1 = weights[[0,40,46]]
                 w2 = weights[[64,42]]
                 w3 = torch.zeros_like(w2)
@@ -241,7 +237,6 @@ if __name__ == '__main__':
                     'mug'#6
                     ]
     
-
     class_map = {
         'bottle': 'bottle',
         'bowl':'bowl',
@@ -266,30 +261,36 @@ if __name__ == '__main__':
         
 
     camera_dir = os.path.join('data', 'camera')
+    real_dir = os.path.join('data', 'real')
     # camera_dir = '../NOCS_CVPR2019/data/camera'
+    # camera_dir = '../NOCS_CVPR2019/data/real'
 
-    trainset = SyntheticData(synset_names,'train')
-    trainset.load_camera_scenes(camera_dir)
-    trainset.prepare(class_map)
+    synthtrain = NOCSData(synset_names,'train')
+    synthtrain.load_camera_scenes(camera_dir)
+    synthtrain.prepare(class_map)
 
-    valset = SyntheticData(synset_names,'val')
+    realtrain = NOCSData(synset_names,'train')
+    realtrain.load_real_scenes(real_dir)
+    realtrain.prepare(class_map)
+
+    valset = NOCSData(synset_names,'val')
     valset.load_camera_scenes(camera_dir)
     valset.prepare(class_map)
 
 
     # Training - Stage 1
     print("Training network heads")
-    model.train_model(trainset, valset,
+    model.train_model([synthtrain,realtrain], valset,
                 learning_rate=config.LEARNING_RATE,
-                epochs=50,
+                epochs=20,
                 layers='heads')
 
     # Training - Stage 2
     # Finetune layers from ResNet stage 4 and up
     print("Training Resnet layer 4+")
-    model.train_model(trainset, valset,
+    model.train_model(synthtrain, valset,
                 learning_rate=config.LEARNING_RATE/10,
-                epochs=3,
+                epochs=5,
                 layers='4+')
 
 
@@ -297,7 +298,7 @@ if __name__ == '__main__':
     # Training - Stage 3
     # Finetune layers from ResNet stage 3 and up
     print("Training Resnet layer 3+")
-    model.train_model(trainset, valset,
+    model.train_model(synthtrain, valset,
                 learning_rate=config.LEARNING_RATE/100,
                 epochs=70,
                 layers='all')

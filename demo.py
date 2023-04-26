@@ -39,7 +39,7 @@ IMAGE_DIR = os.path.join(ROOT_DIR, "images")
 
 
 # Path to specific image
-# IMAGE_SPECIFIC = 'images/0000_color.png'
+# IMAGE_SPECIFIC = 'images/real_real.jpg'
 IMAGE_SPECIFIC = None
 
 class InferenceConfig(coco.CocoConfig):
@@ -121,6 +121,18 @@ result['gt_class_ids'] = gt_class_ids
 result['gt_bboxes'] = gt_bbox
 result['gt_RTs'] = None            
 result['gt_scales'] = gt_scales
+
+def read_file_detect(fl,specific = False):
+
+    if specific:
+        file_name = fl.split('_')[-2].split('/')[-1]
+        print(file_name)
+        image = skimage.io.imread(fl)
+        fl = file_name
+    else:
+        print(fl)
+        image = skimage.io.imread(os.path.join(IMAGE_DIR, fl))
+
 
 
 detect= True

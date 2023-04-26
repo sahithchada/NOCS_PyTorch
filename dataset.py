@@ -13,6 +13,7 @@ import shutil
 from config import Config
 import cv2
 from skimage import exposure
+import glob
 
 ############################################################
 #  Datasets
@@ -236,7 +237,7 @@ class CocoDataset(utils.Dataset):
         m = maskUtils.decode(rle)
         return m
 
-class SyntheticData(utils.Dataset):
+class NOCSData(utils.Dataset):
 
     def __init__(self, synset_names, subset, config=Config()):
         self._image_ids = []
@@ -323,6 +324,59 @@ class SyntheticData(utils.Dataset):
         if if_calculate_mean:
             dataset_color_mean = np.mean(color_mean[::-1], axis=0)
             print('The mean color of this dataset is ', dataset_color_mean)
+
+        num_images_after_load = len(self.image_info)
+        self.source_image_ids[source] = np.arange(num_images_before_load, num_images_after_load)
+        print('{} images are loaded into the dataset from {}.'.format(num_images_after_load - num_images_before_load, source))
+
+    def load_real_scenes(self, dataset_dir):
+        """Load a subset of the Real dataset.
+        dataset_dir: The root directory of the Real dataset.
+        subset: What to load (train, val, test)
+        if_calculate_mean: if calculate the mean color of the images in this dataset
+        """
+
+        source = "Real"
+        num_images_before_load = len(self.image_info)
+
+        folder_name = 'train' if self.subset == 'train' else 'test'
+        image_dir = os.path.join(dataset_dir, folder_name)
+        folder_list = [name for name in glob.glob(image_dir + '/*') if os.path.isdir(name)]
+        folder_list = sorted(folder_list)
+
+        image_id = 0
+        for folder in folder_list:
+            image_list = glob.glob(os.path.join(folder, '*_color.png'))
+            image_list = sorted(image_list)
+
+            for image_full_path in image_list:
+                image_name = os.path.basename(image_full_path)
+                image_ind = image_name.split('_')[0]
+                image_path = os.path.join(folder, image_ind)
+                
+                meta_path = image_path + '_meta.txt'
+                inst_dict = {}
+                with open(meta_path, 'r') as f:
+                    for line in f:
+                        line_info = line.split(' ')
+                        inst_id = int(line_info[0])  ##one-indexed
+                        cls_id = int(line_info[1])  ##zero-indexed
+                        # symmetry_id = int(line_info[2])
+                        inst_dict[inst_id] = cls_id
+
+                
+                width = self.config.IMAGE_MAX_DIM  # meta_data['viewport_size_x'].flatten()[0]
+                height = self.config.IMAGE_MIN_DIM  # meta_data['viewport_size_y'].flatten()[0]
+
+                self.add_image(
+                    source=source,
+                    image_id=image_id,
+                    path=image_path,
+                    width=width,
+                    height=height,
+                    inst_dict=inst_dict)
+                image_id += 1
+            
 
         num_images_after_load = len(self.image_info)
         self.source_image_ids[source] = np.arange(num_images_before_load, num_images_after_load)
