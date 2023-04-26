@@ -14,7 +14,7 @@ import visualize
 
 import torch
 import cv2
-from dataset import SyntheticData
+from dataset import NOCSData
 import datetime
 
 
@@ -107,22 +107,37 @@ if not os.path.exists(save_dir):
             os.makedirs(save_dir)
 now = datetime.datetime.now()
 
-use_camera_data=True
+use_camera_data=False
+image_id=1
 if use_camera_data:
     camera_dir = os.path.join('data', 'camera')
-    dataset = SyntheticData(synset_names,'val')
+    dataset =NOCSData(synset_names,'val')
     dataset.load_camera_scenes(camera_dir)
     dataset.prepare(class_map)
-    image_id=25
+
     image = dataset.load_image(image_id)
     depth=dataset.load_depth(image_id)
     image_path = dataset.image_info[image_id]["path"]
 
     data="camera/val"
+    intrinsics = np.array([[577.5, 0, 319.5], [0., 577.5, 239.5], [0., 0., 1.]]) #for camera data
+
+else:# for real data
+    real_dir = os.path.join('data', 'real')
+    dataset = NOCSData(synset_names,'test')
+    dataset.load_real_scenes(real_dir)
+    dataset.prepare(class_map)
+
+    image = dataset.load_image(image_id)
+    depth=dataset.load_depth(image_id)
+    image_path = dataset.image_info[image_id]["path"]
+
+    data="real/test"
+    intrinsics= np.array([[591.0125, 0, 322.525], [0, 590.16775, 244.11084], [0, 0, 1]])
 
 
 
-intrinsics = np.array([[577.5, 0, 319.5], [0., 577.5, 239.5], [0., 0., 1.]]) #for camera data
+
 result = {}
 gt_mask, gt_coord, gt_class_ids, gt_scales, gt_domain_label = dataset.load_mask(image_id)
 gt_bbox = utils.extract_bboxes(gt_mask)
@@ -157,7 +172,7 @@ if umeyama:
                                                                                         depth, 
                                                                                         intrinsics, 
                                                                                         synset_names,  image_path)
-    draw_rgb=True
+    draw_rgb=False
     result['gt_handle_visibility'] = np.ones_like(gt_class_ids)
     utils.draw_detections(image, save_dir, data, image_id, intrinsics, synset_names, draw_rgb,
                                             gt_bbox, gt_class_ids, gt_mask, gt_coord, result['gt_RTs'], gt_scales, result['gt_handle_visibility'],

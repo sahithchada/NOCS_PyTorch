@@ -1480,5 +1480,6 @@ def draw_detections(image, save_dir, data_name, image_id, intrinsics, synset_nam
                     cv2.addWeighted(overlay, alpha, draw_image_bbox, 1 - alpha, 0, draw_image_bbox)
 
 
-
+        cv2.imshow("trst",draw_image_bbox[:, :, ::-1])
+        cv2.waitKey(0)
         cv2.imwrite(output_path, draw_image_bbox[:, :, ::-1])
