@@ -26,6 +26,7 @@ import torch.nn.functional as F
 from torch.autograd import Variable
 from torchvision.ops import RoIAlign
 import time
+import matplotlib.pyplot as plt
 
 from aligning import estimateSimilarityTransform
 
@@ -1340,21 +1341,13 @@ def draw_detections(image, save_dir, data_name, image_id, intrinsics, synset_nam
                 overlay = draw_image.copy()
                 overlay = draw_text(overlay, gt_bbox[i], synset_names[gt_class_ids[i]], draw_box=True)
                 cv2.addWeighted(overlay, alpha, draw_image, 1 - alpha, 0, draw_image)
-            
-        # #if draw_tag:
-        # for i in range(num_gt_instances):
-        #     print('a', synset_names[gt_class_ids[i]])
-        #     if synset_names[gt_class_ids[i]] == 'camera':
-        #         overlay = draw_image.copy()
-        #         cv2.rectangle(overlay, 
-        #               (gt_bbox[i][1], gt_bbox[i][0]),
-        #               (gt_bbox[i][3], gt_bbox[i][2]),
-        #               (255, 0, 0), 2)
-
-        #         cv2.addWeighted(overlay, alpha, draw_image, 1 - alpha, 0, draw_image)
-
-        
+                   
         cv2.imwrite(output_path, draw_image[:, :, ::-1])
+
+        plt.figure()
+        plt.imshow(draw_image)
+        plt.savefig('hi.png')
+
 
         output_path = os.path.join(save_dir, '{}_{}_bbox_gt.png'.format(data_name, image_id))
         draw_image_bbox = image.copy()
@@ -1375,9 +1368,12 @@ def draw_detections(image, save_dir, data_name, image_id, intrinsics, synset_nam
 
         cv2.imwrite(output_path, draw_image_bbox[:, :, ::-1])
 
+        plt.figure()
+        plt.imshow(draw_image_bbox[:, :, ::-1])
+        plt.savefig('hi.png')
+
 
     if draw_pred:
-        print('a'*50)
         # Vs, Fs = dataset.load_objs(image_id, is_normalized=True) ## scale is estimated in RT
         output_path   = os.path.join(save_dir, '{}_{}_coord_pred.png'.format(data_name, image_id))
         output_path_r = os.path.join(save_dir, '{}_{}_coord_pred_r.png'.format(data_name, image_id))
@@ -1420,6 +1416,10 @@ def draw_detections(image, save_dir, data_name, image_id, intrinsics, synset_nam
                 cv2.addWeighted(overlay, alpha, draw_image, 1 - alpha, 0, draw_image)
 
         cv2.imwrite(output_path, draw_image[:, :, ::-1])
+
+        plt.figure()
+        plt.imshow(draw_image[:, :, ::-1])
+        plt.savefig('hi.png')
 
 
 
@@ -1482,3 +1482,7 @@ def draw_detections(image, save_dir, data_name, image_id, intrinsics, synset_nam
 
 
         cv2.imwrite(output_path, draw_image_bbox[:, :, ::-1])
+
+        plt.figure()
+        plt.imshow(draw_image_bbox[:, :, ::-1])
+        plt.savefig('hi.png')

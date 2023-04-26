@@ -1,8 +1,11 @@
-import torch
 import torch.nn as nn
 from utils import SamePad2d, pyramid_roi_align
 
 class Nocs_head_bins_wt_unshared(nn.Module):
+    '''
+    NOCS Class for binning. Weights are seperate, meaning x,y,z predictions will not share weights
+    '''
+
     def __init__(self,depth, pool_size,image_shape, num_classes, num_bins, net_name):
         super(Nocs_head_bins_wt_unshared, self).__init__()
         self.pool_size = pool_size
@@ -28,6 +31,10 @@ class Nocs_head_bins_wt_unshared(nn.Module):
         self.relu = nn.ReLU(inplace=True)
 
     def forward(self, x, rois):
+        # x (input) : (batch_size, num_rois, 4)
+        # x (output) : (num_rois, num_classes, num_bins, mask_height, mask_width)
+        # x_feature : (num_rois, num_classes*num_bins, mask_height, mask_width)
+
         x = pyramid_roi_align([rois] + x, self.pool_size, self.image_shape)
         x = self.conv1(self.padding(x))
         x = self.bn1(x)
@@ -51,6 +58,10 @@ class Nocs_head_bins_wt_unshared(nn.Module):
         return x,x_feature
     
 class CoordBinValues(nn.Module):
+    '''
+    Module to convert NOCS bins to values in range [0,1]
+    '''
+
     def __init__(self, coord_num_bins):
         super(CoordBinValues, self).__init__()
         self.coord_num_bins = coord_num_bins

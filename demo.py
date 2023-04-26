@@ -14,7 +14,7 @@ import visualize
 
 import torch
 import cv2
-from dataset import SyntheticData
+from dataset import NOCSData
 import datetime
 
 
@@ -31,7 +31,7 @@ MODEL_DIR = os.path.join(ROOT_DIR, "logs")
 # project (See README file for details)
 
 COCO_MODEL_PATH = os.path.join(ROOT_DIR, "models/mask_rcnn_coco.pth")
-# TRAINED_PATH = 'models\mask_rcnn_nocs_train_0010.pth'
+# TRAINED_PATH = 'models/good_models/nocs_train20230422T1839/mask_rcnn_nocs_train_0025.pth'
 TRAINED_PATH = 'mask_rcnn_nocs_train_0031.pth'
 
 # Directory of images to run detection on
@@ -100,66 +100,59 @@ model.load_state_dict(torch.load(TRAINED_PATH,map_location=torch.device('cpu')))
 #after loading model
 
 camera_dir = os.path.join('data', 'camera')
-dataset = SyntheticData(synset_names,'val')
+dataset = NOCSData(synset_names,'val')
 dataset.load_camera_scenes(camera_dir)
 dataset.prepare(class_map)
-image_id=14
-image = dataset.load_image(image_id)
-depth=dataset.load_depth(image_id)
-image_path = dataset.image_info[image_id]["path"]
-now = datetime.datetime.now()
-data="camera/val"
-save_dir = os.path.join('output_images', "{}_{:%Y%m%dT%H%M}".format(data, now))
 
-intrinsics = np.array([[577.5, 0, 319.5], [0., 577.5, 239.5], [0., 0., 1.]]) #for camera data
-result = {}
-gt_mask, gt_coord, gt_class_ids, gt_scales, gt_domain_label = dataset.load_mask(image_id)
-gt_bbox = utils.extract_bboxes(gt_mask)
-result['image_id'] = image_id
-result['image_path'] = image_path
-result['gt_class_ids'] = gt_class_ids
-result['gt_bboxes'] = gt_bbox
-result['gt_RTs'] = None            
-result['gt_scales'] = gt_scales
+for image_id in [9]:
+    # image_id=22
+    image = dataset.load_image(image_id)
+    depth=dataset.load_depth(image_id)
+    image_path = dataset.image_info[image_id]["path"]
+    now = datetime.datetime.now()
+    data="camera/val"
+    save_dir = os.path.join('output_images', "{}_{:%Y%m%dT%H%M}".format(data, now))
 
-def read_file_detect(fl,specific = False):
+    intrinsics = np.array([[577.5, 0, 319.5], [0., 577.5, 239.5], [0., 0., 1.]]) #for camera data
+    result = {}
+    gt_mask, gt_coord, gt_class_ids, gt_scales, gt_domain_label = dataset.load_mask(image_id)
+    gt_bbox = utils.extract_bboxes(gt_mask)
+    result['image_id'] = image_id
+    result['image_path'] = image_path
+    result['gt_class_ids'] = gt_class_ids
+    result['gt_bboxes'] = gt_bbox
+    result['gt_RTs'] = None            
+    result['gt_scales'] = gt_scales
 
-    if specific:
-        file_name = fl.split('_')[-2].split('/')[-1]
-        print(file_name)
-        image = skimage.io.imread(fl)
-        fl = file_name
-    else:
-        print(fl)
-        image = skimage.io.imread(os.path.join(IMAGE_DIR, fl))
+    detect= True
+    if detect:
+
+        if image.shape[2] == 4:
+            image = image[:,:,:3]  
+        # Run detection
+        results = model.detect([image])
+        # Visualize results
+        r = results[0]
+        rois, masks, class_ids, scores, coords = r['rois'], r['masks'], r['class_ids'], r['scores'],r['coords']
+        # visualize.plot_nocs(coords,masks,image_id)
+        # visualize.display_instances(image, rois, masks, class_ids, synset_names,image_id,scores)
+
+        coords[:,:,:,-1] = 1 - coords[:,:,:,-1]
+        # coords[:,:,:,0] = 1 - coords[:,:,:,0]
 
 
+    umeyama=True
 
-detect= True
-if detect:
+    if umeyama:
 
-    if image.shape[2] == 4:
-        image = image[:,:,:3]  
-    # Run detection
-    results = model.detect([image])
-    # Visualize results
-    r = results[0]
-    rois, masks, class_ids, scores, coords = r['rois'], r['masks'], r['class_ids'], r['scores'],r['coords']
-    visualize.plot_nocs(coords,masks,image_id)
-    visualize.display_instances(image, rois, masks, class_ids, synset_names,image_id,scores)
-
-umeyama=True
-
-if umeyama:
-
-    result['pred_RTs'], result['pred_scales'], error_message, elapses =  utils.align(r['class_ids'], 
-                                                                                        r['masks'], 
-                                                                                        r['coords'], 
-                                                                                        depth, 
-                                                                                        intrinsics, 
-                                                                                        synset_names,  image_path)
-    draw_rgb=True
-    result['gt_handle_visibility'] = np.ones_like(gt_class_ids)
-    utils.draw_detections(image, save_dir, data, image_id, intrinsics, synset_names, draw_rgb,
-                                            gt_bbox, gt_class_ids, gt_mask, gt_coord, result['gt_RTs'], gt_scales, result['gt_handle_visibility'],
-                                            r['rois'], r['class_ids'], r['masks'], r['coords'], result['pred_RTs'], r['scores'], result['pred_scales'])
+        result['pred_RTs'], result['pred_scales'], error_message, elapses =  utils.align(r['class_ids'], 
+                                                                                            r['masks'], 
+                                                                                            r['coords'], 
+                                                                                            depth, 
+                                                                                            intrinsics, 
+                                                                                            synset_names,  image_path)
+        draw_rgb=True
+        result['gt_handle_visibility'] = np.ones_like(gt_class_ids)
+        utils.draw_detections(image, save_dir, data, image_id, intrinsics, synset_names, draw_rgb,
+                                                gt_bbox, gt_class_ids, gt_mask, gt_coord, result['gt_RTs'], gt_scales, result['gt_handle_visibility'],
+                                                r['rois'], r['class_ids'], r['masks'], r['coords'], result['pred_RTs'], r['scores'], result['pred_scales'])

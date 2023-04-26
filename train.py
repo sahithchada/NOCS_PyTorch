@@ -1,8 +1,3 @@
-import os
-import time
-import numpy as np
-import skimage.io
-
 # Download and install the Python COCO tools from https://github.com/waleedka/coco
 # That's a fork from the original https://github.com/pdollar/coco with a bug
 # fix for Python 3.
@@ -10,24 +5,20 @@ import skimage.io
 # If the PR is merged then use the original repo.
 # Note: Edit PythonAPI/Makefile and replace "python" with "python3".
 
-
-import matplotlib.pyplot as plt
-import visualize
-import random
-
-
+# Imports
+import os
+import time
+import numpy as np
 from config import Config
-import utils
 import model as modellib
-
 import torch
 import argparse
-
 from dataset import NOCSData, CocoDataset
 
 # Root directory of the project
 ROOT_DIR = os.getcwd()
 
+# Path to save model folders
 MODEL_DIR = os.path.join(ROOT_DIR, "models")
 
 # Path to trained weights file
@@ -36,8 +27,6 @@ COCO_MODEL_PATH = os.path.join(ROOT_DIR, "models/mask_rcnn_coco.pth")
 # Directory to save logs and model checkpoints, if not provided
 # through the command line argument --logs
 DEFAULT_LOGS_DIR = os.path.join(ROOT_DIR, "logs")
-
-IMAGE_DIR = os.path.join(ROOT_DIR, "images")
 
 ############################################################
 #  Configurations
@@ -65,7 +54,7 @@ class CocoConfig(Config):
 class Nocs_train_config(Config):
     # config file for nocs training, derives from base config  
     NAME="NOCS_train"
-    GPU_COUNT = 0
+    GPU_COUNT = 1
     IMAGES_PER_GPU = 1
 
     # Number of classes (including background)
@@ -107,7 +96,13 @@ class Nocs_train_config(Config):
 
     USE_MINI_MASK = False
 
-def model_loaded_weights(config,inference = None,trained_path = None):
+def model_loaded_weights(config,trained_path = None):
+
+    """     
+    Loading MaskRCNN model with additional heads using config file.
+    trained_path : path to trained weights in pth format
+    If none, we presume training on the classes in synset and weights are chosen accordingly  
+    """
     
     model = modellib.MaskRCNN(config=config, model_dir=MODEL_DIR)
 
@@ -178,11 +173,8 @@ def model_loaded_weights(config,inference = None,trained_path = None):
 
         model.load_state_dict(filtered_state_dict, strict=False)
 
-    if inference:
-        pass
-    else:
-        # # Update the log directory
-        model.set_log_dir(COCO_MODEL_PATH)
+
+    model.set_log_dir(COCO_MODEL_PATH)
 
     if config.GPU_COUNT > 0:
         device = torch.device('cuda')
@@ -206,8 +198,11 @@ if __name__ == '__main__':
 
     config = Nocs_train_config()
 
-    camera_train_dir = os.path.join('data', 'train')
-    camera_val_dir=os.path.join('data', 'val')
+    # Defining camera and real directories
+    camera_dir = os.path.join('data', 'camera')
+    real_dir = os.path.join('data', 'real')
+    # camera_dir = '../NOCS_CVPR2019/data/camera'
+    # camera_dir = '../NOCS_CVPR2019/data/real'
 
     #  real classes
     coco_names = ['BG', 'person', 'bicycle', 'car', 'motorcycle', 'airplane',
@@ -252,27 +247,21 @@ if __name__ == '__main__':
         coco_cls_ids.append(ind)
     config.display()
 
-    # 'models/nocs_train20230422T1839/mask_rcnn_nocs_train_0025.pth'
-
-
-    # Put train path none if training a new model
+    # trained_path = None if training a new model
     # model = model_loaded_weights(config,trained_path='models/nocs_train20230422T1839/mask_rcnn_nocs_train_0025.pth')
     model = model_loaded_weights(config,trained_path=None)
         
-
-    camera_dir = os.path.join('data', 'camera')
-    real_dir = os.path.join('data', 'real')
-    # camera_dir = '../NOCS_CVPR2019/data/camera'
-    # camera_dir = '../NOCS_CVPR2019/data/real'
-
+    # Load and prep synthetic train data
     synthtrain = NOCSData(synset_names,'train')
     synthtrain.load_camera_scenes(camera_dir)
     synthtrain.prepare(class_map)
 
+    # Load and prep real train data
     realtrain = NOCSData(synset_names,'train')
     realtrain.load_real_scenes(real_dir)
     realtrain.prepare(class_map)
 
+    # Load and prep synthetic validation data
     valset = NOCSData(synset_names,'val')
     valset.load_camera_scenes(camera_dir)
     valset.prepare(class_map)
@@ -288,7 +277,7 @@ if __name__ == '__main__':
     # Training - Stage 2
     # Finetune layers from ResNet stage 4 and up
     print("Training Resnet layer 4+")
-    model.train_model(synthtrain, valset,
+    model.train_model([synthtrain,realtrain], valset,
                 learning_rate=config.LEARNING_RATE/10,
                 epochs=5,
                 layers='4+')
@@ -298,7 +287,7 @@ if __name__ == '__main__':
     # Training - Stage 3
     # Finetune layers from ResNet stage 3 and up
     print("Training Resnet layer 3+")
-    model.train_model(synthtrain, valset,
+    model.train_model([synthtrain,realtrain], valset,
                 learning_rate=config.LEARNING_RATE/100,
                 epochs=70,
                 layers='all')
