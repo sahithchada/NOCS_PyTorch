@@ -107,9 +107,9 @@ if not os.path.exists(save_dir):
             os.makedirs(save_dir)
 now = datetime.datetime.now()
 
-use_camera_data=False
+use_camera_data=True
 
-image_id=1
+image_id=11
 
 if use_camera_data:
     camera_dir = os.path.join('data', 'camera')
@@ -122,7 +122,7 @@ if use_camera_data:
     image_path = dataset.image_info[image_id]["path"]
 
     data="camera/val"
-    intrinsics = np.array([[577.5, 0, 319.5], [0., 577.5, 239.5], [0., 0., 1.]]) #for camera data
+    intrinsics = np.array([[577.5, 0, 319.5], [0., 577.5, 239.5], [0., 0., 1.]]) # for camera data
 
 else:# for real data
     real_dir = os.path.join('data', 'real')
@@ -135,7 +135,7 @@ else:# for real data
     image_path = dataset.image_info[image_id]["path"]
 
     data="real/test"
-    intrinsics= np.array([[591.0125, 0, 322.525], [0, 590.16775, 244.11084], [0, 0, 1]])
+    intrinsics= np.array([[591.0125, 0, 322.525], [0, 590.16775, 244.11084], [0, 0, 1]]) # for real data
 
 
 start_time = datetime.datetime.now()
@@ -151,8 +151,8 @@ result['gt_RTs'] = None
 result['gt_scales'] = gt_scales
 
 
-    detect= True
-    if detect:
+detect= True
+if detect:
 
     if image.shape[2] == 4:
         image = image[:,:,:3]  
@@ -161,29 +161,24 @@ result['gt_scales'] = gt_scales
     # Visualize results
     r = results[0]
     rois, masks, class_ids, scores, coords = r['rois'], r['masks'], r['class_ids'], r['scores'],r['coords']
-    #visualize.plot_nocs(coords,masks,image_id)
-    #visualize.display_instances(image, rois, masks, class_ids, synset_names,image_id,scores)
-    #visualize.plot_nocs(coords,masks,image_id)
-    #visualize.display_instances(image, rois, masks, class_ids, synset_names,image_id,scores)
-    #print(np.max(r['coords'][2]))
-    #r['coords'][2]=1-r['coords'][2]
+
     r['coords'][:,:,:,2]=1-r['coords'][:,:,:,2]
 
     umeyama=True
 
     if umeyama:
 
-    result['pred_RTs'], result['pred_scales'], error_message, elapses =  utils.align(r['class_ids'], 
-                                                                                        r['masks'], 
-                                                                                        r['coords'], 
-                                                                                        depth, 
-                                                                                        intrinsics, 
-                                                                                        synset_names,  image_path)
-    draw_rgb=False
-    result['gt_handle_visibility'] = np.ones_like(gt_class_ids)
-    utils.draw_detections(image, save_dir, data, image_id, intrinsics, synset_names, draw_rgb,
-                                            gt_bbox, gt_class_ids, gt_mask, gt_coord, result['gt_RTs'], gt_scales, result['gt_handle_visibility'],
-                                            r['rois'], r['class_ids'], r['masks'], r['coords'], result['pred_RTs'], r['scores'], result['pred_scales'],draw_gt=False)
+        result['pred_RTs'], result['pred_scales'], error_message, elapses =  utils.align(r['class_ids'], 
+                                                                                            r['masks'], 
+                                                                                            r['coords'], 
+                                                                                            depth, 
+                                                                                            intrinsics, 
+                                                                                            synset_names,  image_path)
+        draw_rgb=False
+        result['gt_handle_visibility'] = np.ones_like(gt_class_ids)
+        utils.draw_detections(image, save_dir, data, image_id, intrinsics, synset_names, draw_rgb,
+                                                gt_bbox, gt_class_ids, gt_mask, gt_coord, result['gt_RTs'], gt_scales, result['gt_handle_visibility'],
+                                                r['rois'], r['class_ids'], r['masks'], r['coords'], result['pred_RTs'], r['scores'], result['pred_scales'],draw_gt=True)
 
 end_time = datetime.datetime.now()
 execution_time = end_time - start_time
