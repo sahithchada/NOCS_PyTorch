@@ -46,7 +46,7 @@ class InferenceConfig(coco.CocoConfig):
     # Set batch size to 1 since we'll be running inference on
     # one image at a time. Batch size = GPU_COUNT * IMAGES_PER_GPU
     # GPU_COUNT = 0 for CPU
-    GPU_COUNT = 0
+    GPU_COUNT = 1
     IMAGES_PER_GPU = 1
     NUM_CLASSES = 1 + 6 # Background plus 6 classes
 
@@ -96,9 +96,18 @@ config.display()
 
 model = modellib.MaskRCNN(config=config, model_dir=MODEL_DIR)
 if config.GPU_COUNT==0:
-    model.load_state_dict(torch.load(TRAINED_PATH,map_location=torch.device('cpu')))
+    model.load_state_dict(torch.load(TRAINED_PATH))
 else:
     model.load_state_dict(torch.load(TRAINED_PATH))
+
+if config.GPU_COUNT > 0:
+        device = torch.device('cuda')
+else:
+    device = torch.device('cpu')
+
+print("Model to:",device)
+
+model.to(device)
 
 #after loading model
 

@@ -7,7 +7,6 @@
 
 # Imports
 import os
-import time
 import numpy as np
 from config import Config
 import model as modellib
@@ -83,10 +82,7 @@ class Nocs_train_config(Config):
     COORD_LOSS_SCALE = 1
     
     COORD_USE_BINS = True
-    if COORD_USE_BINS:
-         COORD_NUM_BINS = 32
-    else:
-        COORD_REGRESS_LOSS   = 'Soft_L1'
+    COORD_NUM_BINS = 32
    
     COORD_SHARE_WEIGHTS = False
     COORD_USE_DELTA = False
@@ -96,7 +92,7 @@ class Nocs_train_config(Config):
 
     USE_MINI_MASK = False
 
-def model_loaded_weights(config,trained_path = None):
+def model_loaded_weights(config, rand_weights = False, trained_path = None):
 
     """     
     Loading MaskRCNN model with additional heads using config file.
@@ -106,20 +102,24 @@ def model_loaded_weights(config,trained_path = None):
     
     model = modellib.MaskRCNN(config=config, model_dir=MODEL_DIR)
 
+    # Load the state dictionary of the pre-trained model
+    pretrained_state_dict = torch.load(COCO_MODEL_PATH)
+
     if trained_path:
 
         model.load_state_dict(torch.load(trained_path))
 
-    else:    
-        
-        # Load the state dictionary of the pre-trained model
-        pretrained_state_dict = torch.load(COCO_MODEL_PATH)
+    elif rand_weights:           
 
         # List of layers to exclude, changed 
-        # exclude_layers = ["classifier","mask"]
+        exclude_layers = ["classifier","mask"]
 
         # Filter out the layers to exclude from the state dictionary
-        # filtered_state_dict = {k: v for k, v in pretrained_state_dict.items() if not any(layer in k for layer in exclude_layers)}
+        filtered_state_dict = {k: v for k, v in pretrained_state_dict.items() if not any(layer in k for layer in exclude_layers)}
+
+        model.load_state_dict(filtered_state_dict, strict=False)
+
+    else:
         filtered_state_dict = pretrained_state_dict
 
         mismatches = ["classifier.linear_class.weight","classifier.linear_class.bias","classifier.linear_bbox.weight","classifier.linear_bbox.bias","mask.conv5.weight","mask.conv5.bias"]
@@ -170,7 +170,7 @@ def model_loaded_weights(config,trained_path = None):
                 final_weights = torch.cat((w1,w3,w2))
 
             filtered_state_dict[mismatches[i]] = final_weights
-
+        
         model.load_state_dict(filtered_state_dict, strict=False)
 
 
@@ -201,8 +201,7 @@ if __name__ == '__main__':
     # Defining camera and real directories
     camera_dir = os.path.join('data', 'camera')
     real_dir = os.path.join('data', 'real')
-    # camera_dir = '../NOCS_CVPR2019/data/camera'
-    # camera_dir = '../NOCS_CVPR2019/data/real'
+
 
     #  real classes
     coco_names = ['BG', 'person', 'bicycle', 'car', 'motorcycle', 'airplane',
@@ -248,7 +247,6 @@ if __name__ == '__main__':
     config.display()
 
     # trained_path = None if training a new model
-    # model = model_loaded_weights(config,trained_path='models/nocs_train20230422T1839/mask_rcnn_nocs_train_0025.pth')
     model = model_loaded_weights(config,trained_path=None)
         
     # Load and prep synthetic train data
@@ -271,7 +269,7 @@ if __name__ == '__main__':
     print("Training network heads")
     model.train_model([synthtrain,realtrain], valset,
                 learning_rate=config.LEARNING_RATE,
-                epochs=20,
+                epochs=10,
                 layers='heads')
 
     # Training - Stage 2
