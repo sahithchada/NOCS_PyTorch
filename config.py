@@ -84,8 +84,8 @@ class Config(object):
 
     # If enabled, resizes instance masks to a smaller size to reduce
     # memory load. Recommended when using high-resolution images.
-    USE_MINI_MASK = True
-    MINI_MASK_SHAPE = (56, 56)  # (height, width) of the mini-mask
+    USE_MINI_MASK = False
+    MINI_MASK_SHAPE = (28, 28)  # (height, width) of the mini-mask
 
     # Input image resing
     # Images are resized such that the smallest side is >= IMAGE_MIN_DIM and
@@ -148,7 +148,9 @@ class Config(object):
     # train the RPN.
     USE_RPN_ROIS = True
 
-    NUM_BINS=16
+    NUM_BINS=32
+
+    OBJ_MODEL_DIR = os.path.join('data','obj_models')
 
     def __init__(self):
         """Set values of computed attributes."""

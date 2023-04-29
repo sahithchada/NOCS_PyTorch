@@ -75,8 +75,8 @@ def apply_mask(image, mask, color, alpha=0.5):
     return image
 
 
-def display_instances(image, boxes, masks, class_ids, class_names,
-                      scores=None, title="",
+def display_instances(image, boxes, masks, class_ids, class_names, id,
+                      scores=None,title="",
                       figsize=(16, 16), ax=None):
     """
     boxes: [num_instance, (y1, x1, y2, x2, class_id)] in image coordinates.
@@ -124,7 +124,7 @@ def display_instances(image, boxes, masks, class_ids, class_names,
         class_id = class_ids[i]
         score = scores[i] if scores is not None else None
         label = class_names[class_id]
-        x = random.randint(x1, (x1 + x2) // 2)
+        # x = random.randint(x1, (x1 + x2) // 2)
         caption = "{} {:.3f}".format(label, score) if score else label
         ax.text(x1, y1 + 8, caption,
                 color='w', size=11, backgroundcolor="none")
@@ -145,7 +145,10 @@ def display_instances(image, boxes, masks, class_ids, class_names,
             p = Polygon(verts, facecolor="none", edgecolor=color)
             ax.add_patch(p)
     ax.imshow(masked_image.astype(np.uint8))
-    plt.savefig("output_images/visualise.png")
+
+    #id = fl_name.split('_')[0]
+
+    plt.savefig("output_images/"+str(id)+"_instances.png")
     #plt.show()
     
 
@@ -202,6 +205,7 @@ def draw_rois(image, rois, refined_rois, mask, class_ids, class_names, limit=10)
             masked_image = apply_mask(masked_image, m, color)
 
     ax.imshow(masked_image)
+    ax.savefig('output_images/makss.png')
 
     # Print stats
     print("Positive ROIs: ", class_ids[class_ids > 0].shape[0])
@@ -490,4 +494,161 @@ def plot_loss(loss, val_loss, save=True, log_dir=None):
         plt.show(block=False)
         plt.pause(0.1)
 
+def plot_loss2(loss, val_loss, save=True, log_dir=None):
+    loss = np.array(loss)
+    val_loss = np.array(val_loss)
 
+    plt.figure("loss")
+    plt.gcf().clear()
+    plt.subplot(2,1,1)
+    plt.plot(loss[:, 0], label='train')
+    plt.subplot(2,1,2)
+    plt.plot(val_loss[:, 0], label='valid')
+    plt.xlabel('epoch')
+    plt.ylabel('loss')
+    plt.legend()
+    if save:
+        save_path = os.path.join(log_dir, "loss.png")
+        plt.savefig(save_path)
+    else:
+        plt.show(block=False)
+        plt.pause(0.1)
+
+    plt.figure("rpn_class_loss")
+    plt.gcf().clear()
+    plt.subplot(2,1,1)
+    plt.plot(loss[:, 1], label='train')
+    plt.subplot(2,1,2)
+    plt.plot(val_loss[:, 1], label='valid')
+    plt.xlabel('epoch')
+    plt.ylabel('loss')
+    plt.legend()
+    if save:
+        save_path = os.path.join(log_dir, "rpn_class_loss.png")
+        plt.savefig(save_path)
+    else:
+        plt.show(block=False)
+        plt.pause(0.1)
+
+    plt.figure("rpn_bbox_loss")
+    plt.gcf().clear()
+    plt.subplot(2,1,1)
+    plt.plot(loss[:, 2], label='train')
+    plt.subplot(2,1,2)
+    plt.plot(val_loss[:, 2], label='valid')
+    plt.xlabel('epoch')
+    plt.ylabel('loss')
+    plt.legend()
+    if save:
+        save_path = os.path.join(log_dir, "rpn_bbox_loss.png")
+        plt.savefig(save_path)
+    else:
+        plt.show(block=False)
+        plt.pause(0.1)
+
+    plt.figure("mrcnn_class_loss")
+    plt.gcf().clear()
+    plt.subplot(2,1,1)
+    plt.plot(loss[:, 3], label='train')
+    plt.subplot(2,1,2)
+    plt.plot(val_loss[:, 3], label='valid')
+    plt.xlabel('epoch')
+    plt.ylabel('loss')
+    plt.legend()
+    if save:
+        save_path = os.path.join(log_dir, "mrcnn_class_loss.png")
+        plt.savefig(save_path)
+    else:
+        plt.show(block=False)
+        plt.pause(0.1)
+
+    plt.figure("mrcnn_bbox_loss")
+    plt.gcf().clear()
+    plt.subplot(2,1,1)
+    plt.plot(loss[:, 4], label='train')
+    plt.subplot(2,1,2)
+    plt.plot(val_loss[:, 4], label='valid')
+    plt.xlabel('epoch')
+    plt.ylabel('loss')
+    plt.legend()
+    if save:
+        save_path = os.path.join(log_dir, "mrcnn_bbox_loss.png")
+        plt.savefig(save_path)
+    else:
+        plt.show(block=False)
+        plt.pause(0.1)
+
+    plt.figure("mrcnn_mask_loss")
+    plt.gcf().clear()
+    plt.subplot(2,1,1)
+    plt.plot(loss[:, 5], label='train')
+    plt.subplot(2,1,2)
+    plt.plot(val_loss[:, 5], label='valid')
+    plt.xlabel('epoch')
+    plt.ylabel('loss')
+    plt.legend()
+    if save:
+        save_path = os.path.join(log_dir, "mrcnn_mask_loss.png")
+        plt.savefig(save_path)
+    else:
+        plt.show(block=False)
+        plt.pause(0.1)
+
+    plt.figure("x_coord_loss")
+    plt.gcf().clear()
+    plt.subplot(2,1,1)
+    plt.plot(loss[:, 6], label='train')
+    plt.subplot(2,1,2)
+    plt.plot(val_loss[:, 6], label='valid')
+    plt.xlabel('epoch')
+    plt.ylabel('loss')
+    plt.legend()
+    if save:
+        save_path = os.path.join(log_dir, "x_coord_loss.png")
+        plt.savefig(save_path)
+    else:
+        plt.show(block=False)
+        plt.pause(0.1)
+
+    plt.figure("y_coord_loss")
+    plt.gcf().clear()
+    plt.subplot(2,1,1)
+    plt.plot(loss[:, 7], label='train')
+    plt.subplot(2,1,2)
+    plt.plot(val_loss[:, 7], label='valid')
+    plt.xlabel('epoch')
+    plt.ylabel('loss')
+    plt.legend()
+    if save:
+        save_path = os.path.join(log_dir, "y_coord_loss.png")
+        plt.savefig(save_path)
+    else:
+        plt.show(block=False)
+        plt.pause(0.1)
+
+    plt.figure("z_coord_loss")
+    plt.gcf().clear()
+    plt.subplot(2,1,1)
+    plt.plot(loss[:, 8], label='train')
+    plt.subplot(2,1,2)
+    plt.plot(val_loss[:, 8], label='valid')
+    plt.xlabel('epoch')
+    plt.ylabel('loss')
+    plt.legend()
+    if save:
+        save_path = os.path.join(log_dir, "z_coord_loss.png")
+        plt.savefig(save_path)
+    else:
+        plt.show(block=False)
+        plt.pause(0.1)
+
+
+
+def plot_nocs(coords,masks,id):
+
+    masked_coord=coords*np.expand_dims(masks, axis=-1)
+    out=np.sum(masked_coord,axis=2)
+    
+    plt.figure()
+    plt.imshow(out)
+    plt.savefig("output_images/"+str(id)+"_coords.png")

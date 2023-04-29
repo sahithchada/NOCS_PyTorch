@@ -4,3 +4,4 @@ mask_rcnn_coco.pth
 __pycache__
 output_images
 models
+data
