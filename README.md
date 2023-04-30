@@ -31,6 +31,7 @@ conda create --name <env> --file requirements.txt
 * [Object Meshes](http://download.cs.stanford.edu/orion/nocs/obj_models.zip)
 
 You can download the files and store them under data/. The data folder general structure is shown:
+```bash
 .
 └── data/
     ├── camera/
@@ -51,6 +52,7 @@ You can download the files and store them under data/. The data folder general s
     │   ├── real_test
     │   └── val
     └── ikea_data
+```
 
 ## Pretrained weights
 You can find the following checkpoints in this [download link](http://download.cs.stanford.edu/orion/nocs/ckpts.zip):
