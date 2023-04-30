@@ -3,7 +3,7 @@
 ## Introduction
 
 This is a PyTorch implementation of [**Normalized Object Coordinate Space for Category-Level 6D Object Pose and Size Estimation**](https://arxiv.org/pdf/1901.02970.pdf), a **CVPR 2019 oral** paper.
-The original Tensorflow implementation can be found [here](https://github.com/hughw19/NOCS_CVPR2019)
+The original Tensorflow implementation can be found [here](https://github.com/hughw19/NOCS_CVPR2019). The framework is built on a PyTorch implemenation of Mask-RCNN, which can be found [here](https://github.com/multimodallearning/pytorch-mask-rcnn)
 
 This repository includes:
 * Source code of NOCS.
