@@ -1,5 +1,0 @@
-1 1 bottle3_scene5_norm
-2 2 bowl_blue_ikea_norm
-3 2 bowl_brown_ikea_norm
-4 6 mug2_scene3_norm
-5 4 can_tall_yellow_norm
