@@ -32,7 +32,7 @@ MODEL_DIR = os.path.join(ROOT_DIR, "logs")
 
 COCO_MODEL_PATH = os.path.join(ROOT_DIR, "models/mask_rcnn_coco.pth")
 # TRAINED_PATH = 'models\mask_rcnn_nocs_train_0010.pth'
-TRAINED_PATH = 'models/real_trained.pth'
+TRAINED_PATH = "C:\\Users\\Admin\\Downloads\\NOCS_PyTorch\\models\\mask_rcnn_nocs_train_0036.pth"
 
 # Directory of images to run detection on
 IMAGE_DIR = os.path.join(ROOT_DIR, "images")
@@ -109,7 +109,7 @@ now = datetime.datetime.now()
 
 use_camera_data=False
 
-image_id=1
+image_id=0
 
 if use_camera_data:
     camera_dir = os.path.join('data', 'camera')
@@ -129,7 +129,7 @@ else:# for real data
     dataset = NOCSData(synset_names,'test')
     dataset.load_real_scenes(real_dir)
     dataset.prepare(class_map)
-
+    print('yessss',dataset,real_dir)
     image = dataset.load_image(image_id)
     depth=dataset.load_depth(image_id)
     image_path = dataset.image_info[image_id]["path"]
