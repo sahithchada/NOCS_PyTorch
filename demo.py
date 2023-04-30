@@ -32,7 +32,7 @@ MODEL_DIR = os.path.join(ROOT_DIR, "logs")
 
 COCO_MODEL_PATH = os.path.join(ROOT_DIR, "models/mask_rcnn_coco.pth")
 # TRAINED_PATH = 'models/good_models/nocs_train20230422T1839/mask_rcnn_nocs_train_0025.pth'
-TRAINED_PATH = 'mask_rcnn_nocs_train_0031.pth'
+TRAINED_PATH = 'models/mask_rcnn_nocs_train_0031.pth'
 
 # Directory of images to run detection on
 IMAGE_DIR = os.path.join(ROOT_DIR, "images")
@@ -116,9 +116,9 @@ if not os.path.exists(save_dir):
             os.makedirs(save_dir)
 now = datetime.datetime.now()
 
-use_camera_data=True
+use_camera_data=False
 
-image_id=11
+image_id=17
 
 if use_camera_data:
     camera_dir = os.path.join('data', 'camera')

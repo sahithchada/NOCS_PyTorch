@@ -1488,9 +1488,6 @@ class MaskRCNN(nn.Module):
         max_coord_y = np.amax(mrcnn_coord_y)
         max_coord_z = np.amax(mrcnn_coord_z)
 
-        print('predict result:')
-        print(max_coord_x, max_coord_y, max_coord_z)
-
         mrcnn_coord = np.stack([mrcnn_coord_x, mrcnn_coord_y, mrcnn_coord_z], axis = -1)
 
         # Process detections
@@ -1809,9 +1806,6 @@ class MaskRCNN(nn.Module):
                 synth_iter = iter(synthgenerator)
                 real_iter = iter(realgenerator)
 
-                print(len(synth_iter))
-
-
         else:
 
             datageniter = iter(datagenerator)
@@ -1826,10 +1820,10 @@ class MaskRCNN(nn.Module):
 
                     if num > 0.4:
                         inputs = next(synth_iter)
-                        print('synth')
+
                     else:
                         inputs = next(real_iter)
-                        print('real')
+
 
             else:
 
@@ -1846,11 +1840,6 @@ class MaskRCNN(nn.Module):
             gt_masks = inputs[6]
             gt_coords = inputs[7]
             gt_domain_label = inputs[8]
-
-            # plt.figure(1)
-            # plt.imshow(gt_masks[0].sum(0))
-            # plt.savefig('output_images/dual_test.png')
-            # plt.close(1)
 
             if rpn_bbox.sum() == 0:
                 batch_count -= 1
@@ -1878,15 +1867,12 @@ class MaskRCNN(nn.Module):
             if self.config.GPU_COUNT:
                 target_domain_labels = target_domain_labels.cuda() 
 
-            ########### Calculating and calling symmetric los here ############################
-            #coord_bin_loss = compute_mrcnn_coord_bins_symmetry_loss(target_mask, target_coords, target_class_ids, target_domain_labels, mrcnn_coords_bin)
 
             # Compute losses
             rpn_class_loss, rpn_bbox_loss, mrcnn_class_loss, mrcnn_bbox_loss, mrcnn_mask_loss ,coord_bin_loss = compute_losses(rpn_match, rpn_bbox, rpn_class_logits, rpn_pred_bbox, target_class_ids, mrcnn_class_logits, target_deltas, mrcnn_bbox, target_mask, mrcnn_mask, mrcnn_coords_bin,target_coords,target_domain_labels)
             coord_x_bin_loss = coord_bin_loss[0]
             coord_y_bin_loss = coord_bin_loss[1]
             coord_z_bin_loss = coord_bin_loss[2]
-            # print(mrcnn_coords_bin)
             loss = rpn_class_loss + rpn_bbox_loss + mrcnn_class_loss + mrcnn_bbox_loss + mrcnn_mask_loss+coord_x_bin_loss+coord_y_bin_loss+coord_z_bin_loss 
 
             # Backpropagation
