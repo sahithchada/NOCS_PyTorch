@@ -19,7 +19,7 @@ This code has been tested with
 Replicate the conda environment using:
 ```
 conda create --name <env> --file requirements.txt
-``
+```
 
 ## Datasets
 * CAMERA Dataset: [Training](http://download.cs.stanford.edu/orion/nocs/camera_train.zip)/[Test](http://download.cs.stanford.edu/orion/nocs/camera_val25K.zip)/[IKEA_backgrounds](http://download.cs.stanford.edu/orion/nocs/ikea_data.zip)/[Composed_depths](http://download.cs.stanford.edu/orion/nocs/camera_composed_depth.zip)
