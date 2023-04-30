@@ -1,9 +1,6 @@
-# Download and install the Python COCO tools from https://github.com/waleedka/coco
-# That's a fork from the original https://github.com/pdollar/coco with a bug
-# fix for Python 3.
-# I submitted a pull request https://github.com/cocodataset/cocoapi/pull/50
-# If the PR is merged then use the original repo.
-# Note: Edit PythonAPI/Makefile and replace "python" with "python3".
+# Main training file
+# Note that pre-trained weights are loaded from models directory
+# Config may be altered
 
 # Imports
 import os
@@ -96,7 +93,7 @@ def model_loaded_weights(config, rand_weights = False, trained_path = None):
 
     """     
     Loading MaskRCNN model with additional heads using config file.
-    trained_path : path to trained weights in pth format
+    trained_path : path to NOCS trained weights in pth format
     If none, we presume training on the classes in synset and weights are chosen accordingly  
     """
     
@@ -176,12 +173,13 @@ def model_loaded_weights(config, rand_weights = False, trained_path = None):
 
     model.set_log_dir(COCO_MODEL_PATH)
 
-    if config.GPU_COUNT > 0:
+    if config.GPU_COUNT > 0 and torch.cuda.is_available():
         device = torch.device('cuda')
+        
     else:
         device = torch.device('cpu')
 
-    print("Model to:",device)
+    print("Model to:", device)
 
     model.to(device)
 
@@ -194,7 +192,7 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     os.environ['CUDA_VISIBLE_DEVICES']=args.gpu
-    print('Using GPU {}.'.format(args.gpu))
+    
 
     config = Nocs_train_config()
 
@@ -247,7 +245,7 @@ if __name__ == '__main__':
     config.display()
 
     # trained_path = None if training a new model
-    model = model_loaded_weights(config,trained_path=None)
+    model = model_loaded_weights(config, rand_weights = False, trained_path=None)
         
     # Load and prep synthetic train data
     synthtrain = NOCSData(synset_names,'train')
@@ -289,7 +287,3 @@ if __name__ == '__main__':
                 learning_rate=config.LEARNING_RATE/100,
                 epochs=70,
                 layers='all')
-    
-
-
-

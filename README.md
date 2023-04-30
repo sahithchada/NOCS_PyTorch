@@ -1,4 +1,4 @@
-# Pytorch Implementation of "Normalized Object Coordinate Space for Category-Level 6D Object Pose and Size Estimation"
+# PyTorch Implementation of "Normalized Object Coordinate Space for Category-Level 6D Object Pose and Size Estimation"
 
 ## Introduction
 
@@ -21,6 +21,15 @@ Replicate the conda environment using:
 ```
 conda create --name <env> --file requirements.txt
 ```
+
+## Implementation
+
+This code implements the model of the original paper with the following settings:
+* NOCS values treated as classification (bins)
+* Unshared weights between NOCS heads
+* Symmetric Loss
+* Real & Synthetic data training (no COCO)
+
 
 ## Datasets
 * CAMERA Dataset: [Training](http://download.cs.stanford.edu/orion/nocs/camera_train.zip)/[Test](http://download.cs.stanford.edu/orion/nocs/camera_val25K.zip)/[IKEA_backgrounds](http://download.cs.stanford.edu/orion/nocs/ikea_data.zip)/[Composed_depths](http://download.cs.stanford.edu/orion/nocs/camera_composed_depth.zip)
@@ -56,11 +65,11 @@ You can download the files and store them under data/. The data folder general s
 ```
 
 ## Pretrained weights
-You can find the following checkpoints in this [download link](http://download.cs.stanford.edu/orion/nocs/ckpts.zip):
-* NOCS RCNN jointly trained on CAMERA, Real & MS COCO with 32 bin classification setting
+You can find the following checkpoints in this [download link](https://drive.google.com/uc?export=download&id=1SeNduFmmuFugT-1SE186YEPahM61JrAH):
+* NOCS RCNN jointly trained on CAMERA, Real & MS COCO with 32 bin classification setting (Two sets of weights)
 * Mask RCNN pretrained on MS COCO dataset
 
-You can download the checkpoints and store them under logs/.
+You can download the checkpoints and store them under models/.
 
 ## Training
 ```

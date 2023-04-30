@@ -1342,7 +1342,7 @@ def draw_detections(image, save_dir, data_name, image_id, intrinsics, synset_nam
                 overlay = draw_text(overlay, gt_bbox[i], synset_names[gt_class_ids[i]], draw_box=True)
                 cv2.addWeighted(overlay, alpha, draw_image, 1 - alpha, 0, draw_image)
                    
-        cv2.imwrite('gt_coords.png', draw_image[:, :, ::-1])
+        cv2.imwrite('output_images/gt_coords.png', draw_image[:, :, ::-1])
 
         output_path = os.path.join(save_dir, '{}_{}_bbox_gt.png'.format(data_name, image_id))
         draw_image_bbox = image.copy()
@@ -1410,7 +1410,7 @@ def draw_detections(image, save_dir, data_name, image_id, intrinsics, synset_nam
                 overlay = draw_text(overlay, pred_bbox[i], text, draw_box=True)
                 cv2.addWeighted(overlay, alpha, draw_image, 1 - alpha, 0, draw_image)
 
-        cv2.imwrite('coords.png', draw_image[:, :, ::-1])
+        cv2.imwrite('output_images/coords.png', draw_image[:, :, ::-1])
 
 
 
@@ -1475,6 +1475,4 @@ def draw_detections(image, save_dir, data_name, image_id, intrinsics, synset_nam
 
         cv2.imshow("trst",draw_image_bbox[:, :, ::-1])
         cv2.waitKey(0)
-        cv2.imwrite('hi.png', draw_image_bbox[:, :, ::-1])
-
-        print('hi')
+        cv2.imwrite('output_images/hi.png', draw_image_bbox[:, :, ::-1])
