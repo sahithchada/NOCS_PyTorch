@@ -25,21 +25,15 @@ ROOT_DIR = os.getcwd()
 # Directory to save logs and trained model
 MODEL_DIR = os.path.join(ROOT_DIR, "logs")
 
-# Path to trained weights file
-# Download this file and place in the models directory
-# download link- https://drive.google.com/drive/folders/1LXUgC2IZUYNEoXr05tdqyKFZY0pZyPDc
-# project (See README file for details)
-
 COCO_MODEL_PATH = os.path.join(ROOT_DIR, "models/mask_rcnn_coco.pth")
-# TRAINED_PATH = 'models/good_models/nocs_train20230422T1839/mask_rcnn_nocs_train_0025.pth'
-TRAINED_PATH = 'models/mask_rcnn_nocs_train_0031.pth'
+
+TRAINED_PATH = 'models/mask_rcnn_nocs_train_0036.pth'
 
 # Directory of images to run detection on
 IMAGE_DIR = os.path.join(ROOT_DIR, "images")
 
 
 # Path to specific image
-# IMAGE_SPECIFIC = 'images/real_real.jpg'
 IMAGE_SPECIFIC = None
 
 class InferenceConfig(coco.CocoConfig):
@@ -52,23 +46,6 @@ class InferenceConfig(coco.CocoConfig):
 
 config = InferenceConfig()
 config.display()
-
-#  real classes
-coco_names = ['BG', 'person', 'bicycle', 'car', 'motorcycle', 'airplane',
-                'bus', 'train', 'truck', 'boat', 'traffic light',
-                'fire hydrant', 'stop sign', 'parking meter', 'bench', 'bird',
-                'cat', 'dog', 'horse', 'sheep', 'cow', 'elephant', 'bear',
-                'zebra', 'giraffe', 'backpack', 'umbrella', 'handbag', 'tie',
-                'suitcase', 'frisbee', 'skis', 'snowboard', 'sports ball',
-                'kite', 'baseball bat', 'baseball glove', 'skateboard',
-                'surfboard', 'tennis racket', 'bottle', 'wine glass', 'cup',
-                'fork', 'knife', 'spoon', 'bowl', 'banana', 'apple',
-                'sandwich', 'orange', 'broccoli', 'carrot', 'hot dog', 'pizza',
-                'donut', 'cake', 'chair', 'couch', 'potted plant', 'bed',
-                'dining table', 'toilet', 'tv', 'laptop', 'mouse', 'remote',
-                'keyboard', 'cell phone', 'microwave', 'oven', 'toaster',
-                'sink', 'refrigerator', 'book', 'clock', 'vase', 'scissors',
-                'teddy bear', 'hair drier', 'toothbrush']
 
 synset_names = ['BG', #0
                     'bottle', #1
@@ -88,20 +65,13 @@ class_map = {
     }
 
 
-coco_cls_ids = []
-for coco_cls in class_map:
-    ind = coco_names.index(coco_cls)
-    coco_cls_ids.append(ind)
 config.display()
 
 model = modellib.MaskRCNN(config=config, model_dir=MODEL_DIR)
-if config.GPU_COUNT==0:
-    model.load_state_dict(torch.load(TRAINED_PATH))
-else:
-    model.load_state_dict(torch.load(TRAINED_PATH))
+model.load_state_dict(torch.load(TRAINED_PATH))
 
 if config.GPU_COUNT > 0:
-        device = torch.device('cuda')
+    device = torch.device('cuda')
 else:
     device = torch.device('cpu')
 
@@ -111,14 +81,14 @@ model.to(device)
 
 #after loading model
 
-save_dir = os.path.join('output_images')
+save_dir = 'output_images'
 if not os.path.exists(save_dir):
             os.makedirs(save_dir)
 now = datetime.datetime.now()
 
-use_camera_data=False
+use_camera_data = False
 
-image_id=17
+image_id = 347
 
 if use_camera_data:
     camera_dir = os.path.join('data', 'camera')
@@ -164,30 +134,36 @@ detect= True
 if detect:
 
     if image.shape[2] == 4:
-        image = image[:,:,:3]  
-    # Run detection
-    results = model.detect([image])
-    # Visualize results
-    r = results[0]
-    rois, masks, class_ids, scores, coords = r['rois'], r['masks'], r['class_ids'], r['scores'],r['coords']
+        image = image[:,:,:3]
 
-    r['coords'][:,:,:,2]=1-r['coords'][:,:,:,2]
+    with torch.no_grad():
+        # Run detection
+        results = model.detect([image])
+        # Visualize results
+        r = results[0]
+        rois, masks, class_ids, scores, coords = r['rois'], r['masks'], r['class_ids'], r['scores'],r['coords']
 
-    umeyama=True
+        r['coords'][:,:,:,2]=1-r['coords'][:,:,:,2]
 
-    if umeyama:
+        plt.figure()
+        plt.imshow(masks.max(2))
+        plt.savefig('output_images/pred_mask.png')
 
-        result['pred_RTs'], result['pred_scales'], error_message, elapses =  utils.align(r['class_ids'], 
-                                                                                            r['masks'], 
-                                                                                            r['coords'], 
-                                                                                            depth, 
-                                                                                            intrinsics, 
-                                                                                            synset_names,  image_path)
-        draw_rgb=False
-        result['gt_handle_visibility'] = np.ones_like(gt_class_ids)
-        utils.draw_detections(image, save_dir, data, image_id, intrinsics, synset_names, draw_rgb,
-                                                gt_bbox, gt_class_ids, gt_mask, gt_coord, result['gt_RTs'], gt_scales, result['gt_handle_visibility'],
-                                                r['rois'], r['class_ids'], r['masks'], r['coords'], result['pred_RTs'], r['scores'], result['pred_scales'],draw_gt=True)
+        umeyama=True
+
+        if umeyama:
+
+            result['pred_RTs'], result['pred_scales'], error_message, elapses =  utils.align(r['class_ids'], 
+                                                                                                r['masks'], 
+                                                                                                r['coords'], 
+                                                                                                depth, 
+                                                                                                intrinsics, 
+                                                                                                synset_names,  image_path)
+            draw_rgb=False
+            result['gt_handle_visibility'] = np.ones_like(gt_class_ids)
+            utils.draw_detections(image, save_dir, data, image_id, intrinsics, synset_names, draw_rgb,
+                                                    gt_bbox, gt_class_ids, gt_mask, gt_coord, result['gt_RTs'], gt_scales, result['gt_handle_visibility'],
+                                                    r['rois'], r['class_ids'], r['masks'], r['coords'], result['pred_RTs'], r['scores'], result['pred_scales'],draw_gt=True)
 
 end_time = datetime.datetime.now()
 execution_time = end_time - start_time
