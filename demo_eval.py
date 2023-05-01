@@ -122,10 +122,6 @@ if use_camera_data:
     dataset.load_camera_scenes(camera_dir)
     dataset.prepare(class_map)
 
-    image = dataset.load_image(image_id)
-    depth=dataset.load_depth(image_id)
-    image_path = dataset.image_info[image_id]["path"]
-
     data="camera/val"
     intrinsics = np.array([[577.5, 0, 319.5], [0., 577.5, 239.5], [0., 0., 1.]]) #for camera data
 
