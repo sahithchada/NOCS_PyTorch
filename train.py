@@ -66,7 +66,7 @@ class Nocs_train_config(Config):
     # config file for nocs training, derives from base config  
     NAME="NOCS_train"
     GPU_COUNT = 1
-    IMAGES_PER_GPU = 1
+    IMAGES_PER_GPU = 2
 
     # Number of classes (including background)
     NUM_CLASSES = 1 + 6  # background + 6 object categories
@@ -259,11 +259,11 @@ if __name__ == '__main__':
 
 
     # Put train path none if training a new model
-    model = model_loaded_weights(config,trained_path='models/nocs_train20230422T1839/mask_rcnn_nocs_train_0025.pth')
+    model = model_loaded_weights(config,trained_path=None)
     # model = model_loaded_weights(config,trained_path=None)
         
 
-    camera_dir = os.path.join('data', 'camera')
+    camera_dir = os.path.join('/home/csci5980/shared/NOCSRocks/NOCS_CVPR2019/data', 'camera')
     # camera_dir = '../NOCS_CVPR2019/data/camera'
 
     trainset = SyntheticData(synset_names,'train')
@@ -279,7 +279,7 @@ if __name__ == '__main__':
     print("Training network heads")
     model.train_model(trainset, valset,
                 learning_rate=config.LEARNING_RATE,
-                epochs=50,
+                epochs=10,
                 layers='heads')
 
     # Training - Stage 2

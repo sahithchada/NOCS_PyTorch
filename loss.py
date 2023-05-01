@@ -125,6 +125,9 @@ def compute_mrcnn_coord_bins_symmetry_loss(target_masks, target_coords, target_c
             y_true_stack = y_true_stack.permute(0, 1, 2, 4, 3)## shape: [num_pos_rois, height, width, 6, 3]
             y_true_stack = y_true_stack + 0.5
 
+            target_mask_positive_index=target_masks[:y_true_stack.shape[0],:]
+            expanded_mask=target_mask_positive_index.unsqueeze(-1).unsqueeze(-1).expand_as(y_true_stack)
+            masked_y_true_stack=expanded_mask*y_true_stack
             # y_true_stack_numpy=y_true_stack.detach().cpu().numpy()
             # mask_numpy= target_masks.detach().cpu().numpy()
             # for i in range(y_true_stack.shape[0]):
@@ -161,6 +164,7 @@ def compute_mrcnn_coord_bins_symmetry_loss(target_masks, target_coords, target_c
             num_of_pixels = mask.sum(dim=[1, 2]) + 0.00001 ## shape: [num_pos_rois]
 
             cross_loss_in_mask = cross_loss * reshape_mask
+            #cross_loss_in_mask = cross_loss 
             sum_loss_in_mask = cross_loss_in_mask.sum(dim=[1,2])
             total_sum_loss_in_mask = sum_loss_in_mask.sum(dim=-1)
 
