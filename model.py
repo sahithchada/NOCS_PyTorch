@@ -1526,6 +1526,7 @@ class MaskRCNN(nn.Module):
             self.apply(set_bn_eval)
 
         # Feature extraction
+        torch.cuda.empty_cache()
         [p2_out, p3_out, p4_out, p5_out, p6_out] = self.fpn(molded_images)
 
         # Note that P6 is used in RPN, but not in the classifier heads.
@@ -1583,6 +1584,7 @@ class MaskRCNN(nn.Module):
             # Add back batch dimension
             detections = detections.unsqueeze(0)
             mrcnn_mask = mrcnn_mask.unsqueeze(0)
+
 
             #using bins, unshared weights, not using deltas
             #nocs inference

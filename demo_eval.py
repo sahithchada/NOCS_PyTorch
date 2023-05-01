@@ -17,6 +17,7 @@ import cv2
 from dataset import NOCSData
 import datetime
 import _pickle as cPickle
+import time
 
 
 
@@ -33,7 +34,7 @@ MODEL_DIR = os.path.join(ROOT_DIR, "logs")
 
 COCO_MODEL_PATH = os.path.join(ROOT_DIR, "models/mask_rcnn_coco.pth")
 # TRAINED_PATH = 'models\mask_rcnn_nocs_train_0010.pth'
-TRAINED_PATH = "C:\\Users\\Admin\\Downloads\\NOCS_PyTorch\\models\\mask_rcnn_nocs_train_0031.pth"
+TRAINED_PATH = "models/real_trained.pth"
 
 # Directory of images to run detection on
 IMAGE_DIR = os.path.join(ROOT_DIR, "images")
@@ -111,7 +112,7 @@ if not os.path.exists(save_dir):
 now = datetime.datetime.now()
 
 use_camera_data=False
-detect= True
+detect= False
 umeyama=True
 
 
@@ -129,9 +130,9 @@ if use_camera_data:
     intrinsics = np.array([[577.5, 0, 319.5], [0., 577.5, 239.5], [0., 0., 1.]]) #for camera data
 
 else:# for real data
-    gt_dir = os.path.join('data','gts', 'real_test')
+    gt_dir = os.path.join('/home/csci5980/shared/NOCSRocks/NOCS_CVPR2019/data','gts', 'real_test')
     # print('oooooo;laaaaaa')
-    real_dir = os.path.join('data', 'real')
+    real_dir = os.path.join('/home/csci5980/shared/NOCSRocks/NOCS_CVPR2019/data', 'real')
     dataset = NOCSData(synset_names,'test')
     dataset.load_real_scenes(real_dir)
     dataset.prepare(class_map)
@@ -160,7 +161,8 @@ if detect:
         result['gt_bboxes'] = gt_bbox
         result['gt_RTs'] = None            
         result['gt_scales'] = gt_scales
-        image_path_parsing = image_path.split('\\')
+        image_path_parsing = image_path.split('/')
+
         
         gt_pkl_path = os.path.join(gt_dir, 'results_{}_{}_{}.pkl'.format('real_test', image_path_parsing[-2], image_path_parsing[-1]))
         print(gt_pkl_path,image_id)
@@ -198,14 +200,19 @@ if detect:
 
                 result['gt_handle_visibility'] = np.ones_like(gt_class_ids)
         print(image.shape)
+
         if image.shape[2] == 4:
            
             image = image[:,:,:3]  
+
         # Run detection
-        results = model.detect([image])
-        # Visualize results
-        r = results[0]
-        rois, masks, class_ids, scores, coords = r['rois'], r['masks'], r['class_ids'], r['scores'],r['coords']
+        with torch.no_grad():
+            results = model.detect([image])
+
+
+            # Visualize results
+            r = results[0]
+            rois, masks, class_ids, scores, coords = r['rois'], r['masks'], r['class_ids'], r['scores'],r['coords']
         #visualize.plot_nocs(coords,masks,image_id)
         #visualize.display_instances(image, rois, masks, class_ids, synset_names,image_id,scores)
         #visualize.plot_nocs(coords,masks,image_id)
@@ -220,6 +227,7 @@ if detect:
         result['pred_scores'] = r['scores']
         if len(r['class_ids']) == 0:
             print('No instance is detected.')
+
  
         if umeyama:
             result['pred_RTs'], result['pred_scales'], error_message, elapses =  utils.align(r['class_ids'], 
@@ -235,7 +243,7 @@ if detect:
                                                     r['rois'], r['class_ids'], r['masks'], r['coords'], result['pred_RTs'], r['scores'], result['pred_scales'],draw_gt=True)
         end_time = datetime.datetime.now()
         
-        path_parse = image_path.split('\\')
+        path_parse = image_path.split('/')
         image_short_path = '_'.join(path_parse[-3:])
         #print(image_short_path)
        
@@ -246,11 +254,14 @@ if detect:
         print('Results of image {} has been saved to {}.'.format(image_short_path, save_path))
         execution_time = end_time - start_time
         print("Time taken for execution:", execution_time)
+        
+
+
 
 
 else:
 
-    log_dir = "output\\"
+    log_dir = "output/"
 
     result_pkl_list = glob.glob(os.path.join(log_dir, 'results_*.pkl'))
     result_pkl_list = sorted(result_pkl_list)
@@ -277,8 +288,8 @@ else:
                 assert False
     
     aps = utils.compute_degree_cm_mAP(final_results, synset_names, log_dir,
-                                                                    degree_thresholds = [5, 10, 15],#range(0, 61, 1), 
-                                                                    shift_thresholds= [5, 10, 15], #np.linspace(0, 1, 31)*15, 
+                                                                    degree_thresholds = range(0, 61, 1),#range(0, 61, 1), 
+                                                                    shift_thresholds= np.linspace(0, 1, 31)*15, #np.linspace(0, 1, 31)*15, 
                                                                     iou_3d_thresholds=np.linspace(0, 1, 101),
                                                                     iou_pose_thres=0.1,
                                                                     use_matches_for_pose=True)
