@@ -26,7 +26,7 @@ MODEL_DIR = os.path.join(ROOT_DIR, "logs")
 
 COCO_MODEL_PATH = os.path.join(ROOT_DIR, "models/mask_rcnn_coco.pth")
 
-TRAINED_PATH = 'models/NOCS_Trained_2.pth'
+TRAINED_PATH = 'models/real_trained.pth'
 
 # Directory of images to run detection on
 IMAGE_DIR = os.path.join(ROOT_DIR, "images")
@@ -39,9 +39,10 @@ class InferenceConfig(coco.CocoConfig):
     # Set batch size to 1 since we'll be running inference on
     # one image at a time. Batch size = GPU_COUNT * IMAGES_PER_GPU
     # GPU_COUNT = 0 for CPU
-    GPU_COUNT = 1
+    GPU_COUNT = 0
     IMAGES_PER_GPU = 1
     NUM_CLASSES = 1 + 6 # Background plus 6 classes
+    OBJ_MODEL_DIR = os.path.join('data','obj_models')
 
 config = InferenceConfig()
 config.display()
@@ -69,11 +70,14 @@ config.display()
 model = modellib.MaskRCNN(config=config, model_dir=MODEL_DIR)
 if config.GPU_COUNT==0:
     model.load_state_dict(torch.load(TRAINED_PATH,map_location=torch.device('cpu')))
+    device = torch.device('cpu')
 else:
     model.load_state_dict(torch.load(TRAINED_PATH))
     device = torch.device('cuda')
-    model.to(device)
 
+
+print("Model to:",device)
+model.to(device)
 
 save_dir = os.path.join('output')
 if not os.path.exists(save_dir):
@@ -84,7 +88,7 @@ now = datetime.datetime.now()
 use_camera_data=False
 
 # Should be true to save detection results, set to false to evaluate
-detect = False
+detect = True
 
 # Whether to do Pose fitting
 umeyama = True
