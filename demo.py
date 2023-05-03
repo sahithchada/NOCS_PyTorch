@@ -25,11 +25,10 @@ MODEL_DIR = os.path.join(ROOT_DIR, "logs")
 
 COCO_MODEL_PATH = os.path.join(ROOT_DIR, "models/mask_rcnn_coco.pth")
 
-TRAINED_PATH = 'models/mask_rcnn_nocs_train_0036.pth'
+TRAINED_PATH = 'models/NOCS_Trained_2.pth'
 
 # Directory of images to run detection on
 IMAGE_DIR = os.path.join(ROOT_DIR, "images")
-
 
 # Path to specific image
 IMAGE_SPECIFIC = None
@@ -38,7 +37,7 @@ class InferenceConfig(coco.CocoConfig):
     # Set batch size to 1 since we'll be running inference on
     # one image at a time. Batch size = GPU_COUNT * IMAGES_PER_GPU
     # GPU_COUNT = 0 for CPU
-    GPU_COUNT = 1
+    GPU_COUNT = 0
     IMAGES_PER_GPU = 1
     NUM_CLASSES = 1 + 6 # Background plus 6 classes
 
@@ -77,20 +76,21 @@ print("Model to:",device)
 
 model.to(device)
 
-#after loading model
-
 save_dir = 'output_images'
 if not os.path.exists(save_dir):
-            os.makedirs(save_dir)
+    os.makedirs(save_dir)
+
 now = datetime.datetime.now()
 
+# Whether to use synthetic or real data
 use_camera_data = False
 
-image_id=0
+# Change this to detect on different img
+image_id = 1
 
 if use_camera_data:
     camera_dir = os.path.join('data', 'camera')
-    dataset =NOCSData(synset_names,'val')
+    dataset = NOCSData(synset_names,'val')
     dataset.load_camera_scenes(camera_dir)
     dataset.prepare(class_map)
 
@@ -106,7 +106,7 @@ else:# for real data
     dataset = NOCSData(synset_names,'test')
     dataset.load_real_scenes(real_dir)
     dataset.prepare(class_map)
-    print('yessss',dataset,real_dir)
+
     image = dataset.load_image(image_id)
     depth=dataset.load_depth(image_id)
     image_path = dataset.image_info[image_id]["path"]
@@ -143,11 +143,7 @@ if detect:
 
         r['coords'][:,:,:,2]=1-r['coords'][:,:,:,2]
 
-        plt.figure()
-        plt.imshow(masks.max(2))
-        plt.savefig('output_images/pred_mask.png')
-
-        umeyama=True
+        umeyama = True
 
         if umeyama:
 
@@ -157,11 +153,11 @@ if detect:
                                                                                                 depth, 
                                                                                                 intrinsics, 
                                                                                                 synset_names,  image_path)
-            draw_rgb=False
+            draw_rgb = False
             result['gt_handle_visibility'] = np.ones_like(gt_class_ids)
             utils.draw_detections(image, save_dir, data, image_id, intrinsics, synset_names, draw_rgb,
                                                     gt_bbox, gt_class_ids, gt_mask, gt_coord, result['gt_RTs'], gt_scales, result['gt_handle_visibility'],
-                                                    r['rois'], r['class_ids'], r['masks'], r['coords'], result['pred_RTs'], r['scores'], result['pred_scales'],draw_gt=True)
+                                                    r['rois'], r['class_ids'], r['masks'], r['coords'], result['pred_RTs'], r['scores'], result['pred_scales'],draw_gt=False)
 
 end_time = datetime.datetime.now()
 execution_time = end_time - start_time

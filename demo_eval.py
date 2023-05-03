@@ -13,7 +13,7 @@ import torch
 import cv2
 from dataset import NOCSData
 import datetime
-import pickle as cPickle
+import _pickle as cPickle
 import time
 
 
@@ -25,44 +25,26 @@ ROOT_DIR = os.getcwd()
 MODEL_DIR = os.path.join(ROOT_DIR, "logs")
 
 COCO_MODEL_PATH = os.path.join(ROOT_DIR, "models/mask_rcnn_coco.pth")
-# TRAINED_PATH = 'models\mask_rcnn_nocs_train_0010.pth'
-TRAINED_PATH = "models/real_trained.pth"
+
+TRAINED_PATH = 'models/NOCS_Trained_2.pth'
 
 # Directory of images to run detection on
 IMAGE_DIR = os.path.join(ROOT_DIR, "images")
 
 
 # Path to specific image
-# IMAGE_SPECIFIC = 'images/real_real.jpg'
 IMAGE_SPECIFIC = None
 
 class InferenceConfig(coco.CocoConfig):
     # Set batch size to 1 since we'll be running inference on
     # one image at a time. Batch size = GPU_COUNT * IMAGES_PER_GPU
     # GPU_COUNT = 0 for CPU
-    GPU_COUNT = 0
+    GPU_COUNT = 1
     IMAGES_PER_GPU = 1
     NUM_CLASSES = 1 + 6 # Background plus 6 classes
 
 config = InferenceConfig()
 config.display()
-
-#  real classes
-coco_names = ['BG', 'person', 'bicycle', 'car', 'motorcycle', 'airplane',
-                'bus', 'train', 'truck', 'boat', 'traffic light',
-                'fire hydrant', 'stop sign', 'parking meter', 'bench', 'bird',
-                'cat', 'dog', 'horse', 'sheep', 'cow', 'elephant', 'bear',
-                'zebra', 'giraffe', 'backpack', 'umbrella', 'handbag', 'tie',
-                'suitcase', 'frisbee', 'skis', 'snowboard', 'sports ball',
-                'kite', 'baseball bat', 'baseball glove', 'skateboard',
-                'surfboard', 'tennis racket', 'bottle', 'wine glass', 'cup',
-                'fork', 'knife', 'spoon', 'bowl', 'banana', 'apple',
-                'sandwich', 'orange', 'broccoli', 'carrot', 'hot dog', 'pizza',
-                'donut', 'cake', 'chair', 'couch', 'potted plant', 'bed',
-                'dining table', 'toilet', 'tv', 'laptop', 'mouse', 'remote',
-                'keyboard', 'cell phone', 'microwave', 'oven', 'toaster',
-                'sink', 'refrigerator', 'book', 'clock', 'vase', 'scissors',
-                'teddy bear', 'hair drier', 'toothbrush']
 
 synset_names = ['BG', #0
                     'bottle', #1
@@ -82,10 +64,6 @@ class_map = {
     }
 
 
-coco_cls_ids = []
-for coco_cls in class_map:
-    ind = coco_names.index(coco_cls)
-    coco_cls_ids.append(ind)
 config.display()
 
 model = modellib.MaskRCNN(config=config, model_dir=MODEL_DIR)
@@ -96,42 +74,42 @@ else:
     device = torch.device('cuda')
     model.to(device)
 
-#after loading model
 
 save_dir = os.path.join('output')
 if not os.path.exists(save_dir):
-            os.makedirs(save_dir)
+    os.makedirs(save_dir)
 now = datetime.datetime.now()
 
+# Whether to evaluate on synthetic or real data
 use_camera_data=False
-detect= False
-umeyama=True
+
+# Should be true to save detection results, set to false to evaluate
+detect = False
+
+# Whether to do Pose fitting
+umeyama = True
 
 
 if use_camera_data:
     camera_dir = os.path.join('data', 'camera')
-    dataset =NOCSData(synset_names,'val')
+    dataset = NOCSData(synset_names,'val')
     dataset.load_camera_scenes(camera_dir)
     dataset.prepare(class_map)
 
     data="camera/val"
     intrinsics = np.array([[577.5, 0, 319.5], [0., 577.5, 239.5], [0., 0., 1.]]) #for camera data
 
-else:# for real data
-    gt_dir = os.path.join('/home/csci5980/shared/NOCSRocks/NOCS_CVPR2019/data','gts', 'real_test')
-    # print('oooooo;laaaaaa')
-    real_dir = os.path.join('/home/csci5980/shared/NOCSRocks/NOCS_CVPR2019/data', 'real')
+else:
+    gt_dir = os.path.join('data','gts','real_test')
+
+    real_dir = os.path.join('data', 'real')
     dataset = NOCSData(synset_names,'test')
     dataset.load_real_scenes(real_dir)
     dataset.prepare(class_map)
     image_ids = dataset.image_ids
-    # print('gooood')
-    # image = dataset.load_image(image_id)
-    # depth=dataset.load_depth(image_id)
-    # image_path = dataset.image_info[image_id]["path"]
 
     data="real/test"
-    intrinsics= np.array([[591.0125, 0, 322.525], [0, 590.16775, 244.11084], [0, 0, 1]])
+    intrinsics= np.array([[591.0125, 0, 322.525], [0, 590.16775, 244.11084], [0, 0, 1]]) # for real data
 
 if detect:
     for i, image_id in enumerate(image_ids):
@@ -187,7 +165,6 @@ if detect:
                    
 
                 result['gt_handle_visibility'] = np.ones_like(gt_class_ids)
-        print(image.shape)
 
         if image.shape[2] == 4:
            
@@ -200,7 +177,7 @@ if detect:
             rois, masks, class_ids, scores, coords = r['rois'], r['masks'], r['class_ids'], r['scores'],r['coords']
 
         r['coords'][:,:,:,2]=1-r['coords'][:,:,:,2]
-        #print(r.keys())
+
         result['pred_class_ids'] = r['class_ids']
         result['pred_bboxes'] = r['rois']
         result['pred_RTs'] = None   
@@ -225,7 +202,6 @@ if detect:
         
         path_parse = image_path.split('/')
         image_short_path = '_'.join(path_parse[-3:])
-        #print(image_short_path)
        
         save_path = os.path.join(save_dir, 'results_{}.pkl'.format(image_short_path))
         with open(save_path, 'wb') as f:
@@ -264,8 +240,8 @@ else:
                 assert False
     
     aps = utils.compute_degree_cm_mAP(final_results, synset_names, log_dir,
-                                                                    degree_thresholds = range(0, 61, 1),#range(0, 61, 1), 
-                                                                    shift_thresholds= np.linspace(0, 1, 31)*15, #np.linspace(0, 1, 31)*15, 
+                                                                    degree_thresholds = range(0, 61, 1),
+                                                                    shift_thresholds= np.linspace(0, 1, 31)*15,  
                                                                     iou_3d_thresholds=np.linspace(0, 1, 101),
                                                                     iou_pose_thres=0.1,
                                                                     use_matches_for_pose=True)
