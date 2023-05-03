@@ -13,9 +13,9 @@ This repository includes:
 
 ## Requirements
 This code has been tested with
-* CUDA 12.1 & 
-* Python 3.10 & 3.8
-* PyTorch 2.0
+* CUDA 12.1 & 11.2
+* Python 3.10 & 3.9
+* PyTorch 2.0 & 1.10
 
 Replicate the conda environment using:
 ```
