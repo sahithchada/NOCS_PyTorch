@@ -74,10 +74,25 @@ You can download the checkpoints and store them under models/.
 ## Training
 ```
 # Train a new model from pretrained COCO weights
+# Default uses same categories as original paper
 python train.py
 ```
 
-## Detection and evaluation
+## Detection Demo
+
+```
+# An image from synthetic validation or real test can be loaded and used for inference
+# The image_id on line 89 can be changed to vary the image used.
+python demo.py
+```
+
+## Evaluation
+
+```
+# Weights performance on synthetic validation or real test can be evaluated
+# The script must be run twice. First with detect set to False, and second with true (see line 87)
+python demo_eval.py
+```
 
 
 
