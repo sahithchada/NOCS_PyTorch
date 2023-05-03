@@ -245,6 +245,8 @@ if __name__ == '__main__':
     config.display()
 
     # trained_path = None if training a new model
+    # Default mode assumes 7 classes: BG, Bottle, bowl, camera, can, laptop, mug
+    # Use rand_weights = True if not using the default classes
     model = model_loaded_weights(config, rand_weights = False, trained_path=None)
         
     # Load and prep synthetic train data
