@@ -1465,9 +1465,6 @@ def draw_detections(image, save_dir, data_name, image_id, intrinsics, synset_nam
                     overlay = draw_text(overlay, pred_bbox[ind], text)
                     cv2.addWeighted(overlay, alpha, draw_image_bbox, 1 - alpha, 0, draw_image_bbox)
 
-
-        # cv2.imshow("trst",draw_image_bbox[:, :, ::-1])
-        # cv2.waitKey(0)
         cv2.imwrite('output_images/pred_RT.png', draw_image_bbox[:, :, ::-1])
 
 def compute_3d_iou_new(RT_1, RT_2, scales_1, scales_2, handle_visibility, class_name_1, class_name_2):

@@ -1,10 +1,7 @@
 import os
 import sys
 import random
-import math
 import numpy as np
-import skimage.io
-import matplotlib
 import matplotlib.pyplot as plt
 
 import coco
@@ -16,7 +13,7 @@ import torch
 import cv2
 from dataset import NOCSData
 import datetime
-import _pickle as cPickle
+import pickle as cPickle
 import time
 
 
@@ -26,11 +23,6 @@ ROOT_DIR = os.getcwd()
 
 # Directory to save logs and trained model
 MODEL_DIR = os.path.join(ROOT_DIR, "logs")
-
-# Path to trained weights file
-# Download this file and place in the models directory
-# download link- https://drive.google.com/drive/folders/1LXUgC2IZUYNEoXr05tdqyKFZY0pZyPDc
-# project (See README file for details)
 
 COCO_MODEL_PATH = os.path.join(ROOT_DIR, "models/mask_rcnn_coco.pth")
 # TRAINED_PATH = 'models\mask_rcnn_nocs_train_0010.pth'
@@ -204,17 +196,9 @@ if detect:
         # Run detection
         with torch.no_grad():
             results = model.detect([image])
-
-
-            # Visualize results
             r = results[0]
             rois, masks, class_ids, scores, coords = r['rois'], r['masks'], r['class_ids'], r['scores'],r['coords']
-        #visualize.plot_nocs(coords,masks,image_id)
-        #visualize.display_instances(image, rois, masks, class_ids, synset_names,image_id,scores)
-        #visualize.plot_nocs(coords,masks,image_id)
-        #visualize.display_instances(image, rois, masks, class_ids, synset_names,image_id,scores)
-        #print(np.max(r['coords'][2]))
-        #r['coords'][2]=1-r['coords'][2]
+
         r['coords'][:,:,:,2]=1-r['coords'][:,:,:,2]
         #print(r.keys())
         result['pred_class_ids'] = r['class_ids']
@@ -250,10 +234,6 @@ if detect:
         print('Results of image {} has been saved to {}.'.format(image_short_path, save_path))
         execution_time = end_time - start_time
         print("Time taken for execution:", execution_time)
-        
-
-
-
 
 else:
 
