@@ -150,7 +150,7 @@ class Config(object):
 
     NUM_BINS=32
 
-    OBJ_MODEL_DIR = os.path.join('/home/csci5980/shared/NOCSRocks/NOCS_CVPR2019/data','obj_models')
+    OBJ_MODEL_DIR = os.path.join('data','obj_models')
 
     def __init__(self):
         """Set values of computed attributes."""

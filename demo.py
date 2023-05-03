@@ -25,7 +25,7 @@ MODEL_DIR = os.path.join(ROOT_DIR, "logs")
 
 COCO_MODEL_PATH = os.path.join(ROOT_DIR, "models/mask_rcnn_coco.pth")
 
-TRAINED_PATH = 'models/NOCS_Trained_2.pth'
+TRAINED_PATH = 'models/real_trained.pth'
 
 # Directory of images to run detection on
 IMAGE_DIR = os.path.join(ROOT_DIR, "images")
@@ -40,6 +40,8 @@ class InferenceConfig(coco.CocoConfig):
     GPU_COUNT = 0
     IMAGES_PER_GPU = 1
     NUM_CLASSES = 1 + 6 # Background plus 6 classes
+    OBJ_MODEL_DIR = os.path.join('data','obj_models')
+
 
 config = InferenceConfig()
 config.display()
@@ -65,12 +67,13 @@ class_map = {
 config.display()
 
 model = modellib.MaskRCNN(config=config, model_dir=MODEL_DIR)
-model.load_state_dict(torch.load(TRAINED_PATH))
 
 if config.GPU_COUNT > 0:
     device = torch.device('cuda')
+    model.load_state_dict(torch.load(TRAINED_PATH))
 else:
     device = torch.device('cpu')
+    model.load_state_dict(torch.load(TRAINED_PATH,map_location=torch.device('cpu')))
 
 print("Model to:",device)
 
