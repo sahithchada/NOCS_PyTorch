@@ -5,3 +5,5 @@ __pycache__
 output_images
 models
 data
+output
+logs

@@ -88,7 +88,7 @@ now = datetime.datetime.now()
 
 use_camera_data = False
 
-image_id = 347
+image_id=0
 
 if use_camera_data:
     camera_dir = os.path.join('data', 'camera')
@@ -108,7 +108,7 @@ else:# for real data
     dataset = NOCSData(synset_names,'test')
     dataset.load_real_scenes(real_dir)
     dataset.prepare(class_map)
-
+    print('yessss',dataset,real_dir)
     image = dataset.load_image(image_id)
     depth=dataset.load_depth(image_id)
     image_path = dataset.image_info[image_id]["path"]
