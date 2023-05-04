@@ -11,6 +11,15 @@ This repository includes:
 * Detection and evaluation code
 * Pre-trained weights
 
+## Contributions
+
+This work was done as a final project for CSCI-5980: [DeepRob](https://rpm-lab.github.io/CSCI5980-Spr23-DeepRob/) taught by Professor [Karthik Desingh](https://karthikdesingh.com/). The contributors to the project are:
+* [Bharath Sivaram](https://www.linkedin.com/in/bharath-sivaram-133958159/)
+* [Sahith Reddy Chada](https://www.linkedin.com/in/sahith-reddy-chada/)
+* [Prakadeeswaran Manivannan](https://www.linkedin.com/in/prakadeeswaran-manivannan88a2a5143/)
+
+Special thanks to [Bahaa Aldeeb](https://baldeeb.github.io/) for advising and troubleshooting help.
+
 ## Requirements
 This code has been tested with
 * CUDA 12.1 & 11.2
