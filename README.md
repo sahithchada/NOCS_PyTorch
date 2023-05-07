@@ -13,6 +13,8 @@ This repository includes:
 * Detection and evaluation code
 * Pre-trained weights
 
+If you find this software helpful in your research or work, please consider citing using the Github cite tool on the right.
+
 ## Contributions
 
 This work was done as a final project for CSCI-5980: [DeepRob](https://rpm-lab.github.io/CSCI5980-Spr23-DeepRob/) taught by Professor [Karthik Desingh](https://karthikdesingh.com/). The contributors to the project are:
