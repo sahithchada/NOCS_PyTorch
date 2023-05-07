@@ -1,0 +1,12 @@
+cff-version: 1.2.0
+message: "If you find this software helpful, please consider citing as below"
+authors:
+- family-names: Sahith Reddy
+  given-names: Chada
+- family-names: Bharath
+  given-names: Sivaram
+- family-names: Prakadeeswaran
+  given-names: Manivannan
+title: "NOCS PyTorch"
+version: 1.0.0
+date-released: 2023-05-07
