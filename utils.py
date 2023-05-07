@@ -1349,7 +1349,7 @@ def draw_detections(image, save_dir, data_name, image_id, intrinsics, synset_nam
         draw_image_bbox = image.copy()
 
         if gt_RTs is not None:
-            print('hellllooooooooooooooooooooooooo')
+            # print('hellllooooooooooooooooooooooooo')
             for ind, RT in enumerate(gt_RTs):
                 cls_id = gt_class_ids[ind]
 
