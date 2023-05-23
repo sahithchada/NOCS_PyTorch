@@ -1,5 +1,7 @@
 # PyTorch Implementation of "Normalized Object Coordinate Space for Category-Level 6D Object Pose and Size Estimation"
 
+![resss](https://github.com/sahithchada/NOCS_PyTorch/assets/20588623/3f6d866f-80b9-4015-95da-acebc824a917)
+
 ## Introduction
 
 This is a PyTorch implementation of [**Normalized Object Coordinate Space for Category-Level 6D Object Pose and Size Estimation**](https://arxiv.org/pdf/1901.02970.pdf), a **CVPR 2019 oral** paper.
